@@ -40,7 +40,6 @@ import {
   X,
   Lock,
   Mail,
-  Sparkles,
   ArrowRight,
   Store,
 } from 'lucide-react-native';
@@ -62,7 +61,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function OfferDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { isSaved, toggleSave } = useSavedStore();
+  const toggleSave = useSavedStore((state) => state.toggleSave);
+  const isThisOfferSaved = useSavedStore((state) => (id ? state.savedOffers.some((o) => o.id === id) : false));
   const insets = useSafeAreaInsets();
 
   const authUser = useAuthStore((s) => s.user);
@@ -258,7 +258,7 @@ export default function OfferDetailScreen() {
     return allSlots.find((s) => s.id === selectedSlot);
   }, [allSlots, selectedSlot]);
 
-  const saved = offer ? isSaved(offer.id) : false;
+  const saved = isThisOfferSaved;
 
   const handleHeartPress = () => {
     if (!offer) return;
@@ -575,7 +575,6 @@ export default function OfferDetailScreen() {
 
               {totalSavingsKobo > 0 && (
                 <View style={styles.savingsPill}>
-                  <Sparkles size={11} color={Palette.mulberry} style={{ marginRight: 4 }} />
                   <Text style={styles.savingsPillText}>
                     Save {formatNaira(totalSavingsKobo)} ({discountPercent}% OFF)
                   </Text>

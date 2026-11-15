@@ -5,110 +5,110 @@ import * as Location from 'expo-location';
 const LOCATION_STORAGE_KEY = 'coo_user_location';
 
 export interface UserLocation {
-  name: string;
-  formattedAddress?: string;
-  latitude?: number;
-  longitude?: number;
-  isAutoDetected: boolean;
-  updatedAt: string;
+  name: string;             // Clean short neighborhood / display label (e.g. "Victoria Island", "Adeola Odeku St")
+  formattedAddress: string; // Complete full address
+  latitude: number;         // Exact latitude
+  longitude: number;        // Exact longitude
+  isAutoDetected: boolean;  // True if obtained via device GPS
+  updatedAt: string;        // ISO timestamp
 }
 
-export const POPULAR_AREAS = [
-  'Victoria Island',
-  'Ikoyi',
-  'Lekki Phase 1',
-  'Ikeja GRA',
-  'Maryland',
-  'Surulere',
-  'Gbagada',
-  'Oniru',
-];
+export interface AddressSuggestion {
+  id: string;
+  primaryText: string;     // e.g. "Adeola Odeku Street"
+  secondaryText: string;   // e.g. "Victoria Island, Eti-Osa"
+  fullAddress: string;     // Complete address line
+  latitude: number;
+  longitude: number;
+  shortName: string;       // Neighborhood or short title
+}
 
 interface LocationState {
   currentLocation: UserLocation;
   isDetecting: boolean;
+  isLoadingSuggestions: boolean;
+  suggestions: AddressSuggestion[];
   errorMsg: string | null;
-  savedLocations: UserLocation[];
 
   // Actions
   initLocation: () => Promise<void>;
   detectCurrentLocation: () => Promise<{ success: boolean; location?: UserLocation; error?: string }>;
-  setManualLocation: (areaName: string, coords?: { latitude: number; longitude: number }) => Promise<void>;
-  geocodeAndSetLocation: (searchQuery: string) => Promise<{ success: boolean; location?: UserLocation; error?: string }>;
+  fetchAddressSuggestions: (query: string) => Promise<AddressSuggestion[]>;
+  clearSuggestions: () => void;
+  selectLocation: (loc: {
+    name: string;
+    formattedAddress: string;
+    latitude: number;
+    longitude: number;
+    isAutoDetected?: boolean;
+  }) => Promise<void>;
   clearError: () => void;
 }
 
+// Default fallback coordinates (Victoria Island)
 const DEFAULT_LOCATION: UserLocation = {
   name: 'Victoria Island',
-  formattedAddress: 'Victoria Island',
+  formattedAddress: 'Victoria Island, Eti-Osa',
+  latitude: 6.4281,
+  longitude: 3.4219,
   isAutoDetected: false,
   updatedAt: new Date().toISOString(),
 };
 
 /**
- * Sanitizes address strings to strictly avoid prohibited words (e.g. Lagos)
- * and extract a clean neighborhood or district name.
+ * Sanitizes address strings to strictly comply with rules (strictly no mention of Lagos).
  */
-function sanitizeAreaName(raw?: string | null): string {
+export function sanitizeAddressString(raw?: string | null): string {
   if (!raw) return '';
   return raw
     .replace(/\bLagos\b/gi, '')
     .replace(/\bNigeria\b/gi, '')
-    .replace(/[,\s-]+$/, '')
+    .replace(/\s*,\s*,/g, ',')
     .replace(/^[,\s-]+/, '')
+    .replace(/[,\s-]+$/, '')
     .trim();
 }
 
 /**
- * Extracts the most relevant neighborhood or area name from reverse geocoded address.
+ * Extracts a concise display name / neighborhood from an address object.
  */
-function resolveNeighborhood(addr: Location.LocationGeocodedAddress): string {
-  // Check known popular areas first
-  const candidates = [
-    addr.district,
-    addr.subregion,
-    addr.name,
-    addr.street,
-    addr.city,
-  ].filter(Boolean) as string[];
+function extractShortName(
+  primary: string,
+  district?: string | null,
+  subregion?: string | null
+): string {
+  const cleanDistrict = sanitizeAddressString(district);
+  const cleanSubregion = sanitizeAddressString(subregion);
+  const cleanPrimary = sanitizeAddressString(primary);
 
-  for (const candidate of candidates) {
-    const clean = sanitizeAreaName(candidate);
-    for (const popular of POPULAR_AREAS) {
-      if (clean.toLowerCase().includes(popular.toLowerCase())) {
-        return popular;
-      }
-    }
+  // If district exists (e.g. Victoria Island, Ikoyi, Lekki Phase 1), prefer it for top masthead pill
+  if (cleanDistrict && cleanDistrict.length > 2) {
+    return cleanDistrict;
   }
-
-  // If no exact popular match, pick the best non-empty candidate (district > subregion > street > name)
-  const best =
-    sanitizeAreaName(addr.district) ||
-    sanitizeAreaName(addr.subregion) ||
-    sanitizeAreaName(addr.street) ||
-    sanitizeAreaName(addr.name) ||
-    'Victoria Island';
-
-  return best.replace(/\s+/g, ' ').trim();
+  if (cleanSubregion && cleanSubregion.length > 2) {
+    return cleanSubregion;
+  }
+  return cleanPrimary || 'Victoria Island';
 }
 
 export const useLocationStore = create<LocationState>((set, get) => ({
   currentLocation: DEFAULT_LOCATION,
   isDetecting: false,
+  isLoadingSuggestions: false,
+  suggestions: [],
   errorMsg: null,
-  savedLocations: [],
 
   initLocation: async () => {
     try {
       const raw = await SecureStore.getItemAsync(LOCATION_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as UserLocation;
-        if (parsed?.name) {
+        if (parsed?.name && Number.isFinite(parsed?.latitude) && Number.isFinite(parsed?.longitude)) {
           set({ currentLocation: parsed });
         }
       }
     } catch {
-      // Fallback to default
+      // Keep default
     }
   },
 
@@ -117,7 +117,7 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        const error = 'Location permission was denied. Please select your area manually.';
+        const error = 'Location permission was denied. Please search and select your address.';
         set({ isDetecting: false, errorMsg: error });
         return { success: false, error };
       }
@@ -128,8 +128,8 @@ export const useLocationStore = create<LocationState>((set, get) => ({
 
       const { latitude, longitude } = position.coords;
 
-      let detectedName = 'Victoria Island';
-      let fullAddr = '';
+      let shortName = 'Victoria Island';
+      let fullAddress = 'Victoria Island';
 
       try {
         const reverseResults = await Location.reverseGeocodeAsync({
@@ -139,22 +139,30 @@ export const useLocationStore = create<LocationState>((set, get) => ({
 
         if (reverseResults && reverseResults.length > 0) {
           const addr = reverseResults[0];
-          detectedName = resolveNeighborhood(addr);
+          const street = sanitizeAddressString(addr.street);
+          const name = sanitizeAddressString(addr.name);
+          const district = sanitizeAddressString(addr.district);
+          const subregion = sanitizeAddressString(addr.subregion);
 
-          const parts = [
-            sanitizeAreaName(addr.street),
-            detectedName,
-          ].filter(Boolean);
-          fullAddr = parts.join(', ');
+          shortName = district || subregion || street || name || 'Victoria Island';
+
+          const addressParts = [name || street, district, subregion]
+            .filter(Boolean)
+            .map((p) => sanitizeAddressString(p))
+            .filter(Boolean);
+
+          // Deduplicate parts
+          const uniqueParts = Array.from(new Set(addressParts));
+          fullAddress = uniqueParts.join(', ') || shortName;
         }
       } catch {
-        // Reverse geocoding fallback
-        detectedName = 'Victoria Island';
+        shortName = 'Victoria Island';
+        fullAddress = 'Victoria Island';
       }
 
       const newLocation: UserLocation = {
-        name: detectedName,
-        formattedAddress: fullAddr || detectedName,
+        name: shortName,
+        formattedAddress: fullAddress,
         latitude,
         longitude,
         isAutoDetected: true,
@@ -176,76 +184,154 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     }
   },
 
-  setManualLocation: async (areaName: string, coords?: { latitude: number; longitude: number }) => {
-    const cleanName = sanitizeAreaName(areaName) || areaName;
+  fetchAddressSuggestions: async (query: string): Promise<AddressSuggestion[]> => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 2) {
+      set({ suggestions: [], isLoadingSuggestions: false });
+      return [];
+    }
+
+    set({ isLoadingSuggestions: true });
+
+    try {
+      // 1. Query Photon Geocoding API (Fast OSM autocomplete optimized for typeahead)
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
+        trimmed
+      )}&limit=7&lang=en`;
+
+      const response = await fetch(photonUrl, {
+        headers: { Accept: 'application/json' },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const features = data?.features || [];
+
+        if (features.length > 0) {
+          const items: AddressSuggestion[] = features
+            .map((f: any, idx: number) => {
+              const props = f.properties || {};
+              const coords = f.geometry?.coordinates || [];
+              const lon = coords[0];
+              const lat = coords[1];
+
+              if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+              const name = sanitizeAddressString(props.name || props.street);
+              const district = sanitizeAddressString(props.district || props.city || props.county);
+              const state = sanitizeAddressString(props.state);
+
+              const primaryText = name || district || trimmed;
+              const secondaryParts = [district !== primaryText ? district : null, state]
+                .filter(Boolean)
+                .map((p) => sanitizeAddressString(p))
+                .filter(Boolean);
+
+              const secondaryText = Array.from(new Set(secondaryParts)).join(', ');
+              const fullAddress = [primaryText, secondaryText].filter(Boolean).join(', ');
+              const shortName = extractShortName(primaryText, props.district, props.city);
+
+              return {
+                id: `photon-${idx}-${lat}-${lon}`,
+                primaryText,
+                secondaryText,
+                fullAddress,
+                latitude: lat,
+                longitude: lon,
+                shortName,
+              };
+            })
+            .filter((item: AddressSuggestion | null): item is AddressSuggestion => item !== null);
+
+          if (items.length > 0) {
+            set({ suggestions: items, isLoadingSuggestions: false });
+            return items;
+          }
+        }
+      }
+
+      // 2. Fallback to native expo-location geocoding
+      const nativeResults = await Location.geocodeAsync(trimmed);
+      if (nativeResults && nativeResults.length > 0) {
+        const fallbackItems: AddressSuggestion[] = [];
+
+        for (let i = 0; i < Math.min(nativeResults.length, 4); i++) {
+          const res = nativeResults[i];
+          let primaryText = trimmed;
+          let secondaryText = '';
+          let shortName = trimmed;
+
+          try {
+            const rev = await Location.reverseGeocodeAsync({
+              latitude: res.latitude,
+              longitude: res.longitude,
+            });
+            if (rev && rev.length > 0) {
+              const a = rev[0];
+              const street = sanitizeAddressString(a.street || a.name);
+              const dist = sanitizeAddressString(a.district || a.subregion);
+              if (street) primaryText = street;
+              if (dist) {
+                secondaryText = dist;
+                shortName = dist;
+              }
+            }
+          } catch {
+            // Keep trimmed
+          }
+
+          const fullAddress = [primaryText, secondaryText].filter(Boolean).join(', ');
+
+          fallbackItems.push({
+            id: `native-${i}-${res.latitude}-${res.longitude}`,
+            primaryText,
+            secondaryText,
+            fullAddress,
+            latitude: res.latitude,
+            longitude: res.longitude,
+            shortName,
+          });
+        }
+
+        set({ suggestions: fallbackItems, isLoadingSuggestions: false });
+        return fallbackItems;
+      }
+
+      set({ suggestions: [], isLoadingSuggestions: false });
+      return [];
+    } catch {
+      set({ suggestions: [], isLoadingSuggestions: false });
+      return [];
+    }
+  },
+
+  clearSuggestions: () => {
+    set({ suggestions: [], isLoadingSuggestions: false });
+  },
+
+  selectLocation: async ({ name, formattedAddress, latitude, longitude, isAutoDetected = false }) => {
+    const cleanName = sanitizeAddressString(name) || 'Victoria Island';
+    const cleanFull = sanitizeAddressString(formattedAddress) || cleanName;
+
     const newLocation: UserLocation = {
       name: cleanName,
-      formattedAddress: cleanName,
-      latitude: coords?.latitude,
-      longitude: coords?.longitude,
-      isAutoDetected: false,
+      formattedAddress: cleanFull,
+      latitude,
+      longitude,
+      isAutoDetected,
       updatedAt: new Date().toISOString(),
     };
 
-    set({ currentLocation: newLocation, errorMsg: null });
+    set({
+      currentLocation: newLocation,
+      suggestions: [],
+      errorMsg: null,
+    });
 
     try {
       await SecureStore.setItemAsync(LOCATION_STORAGE_KEY, JSON.stringify(newLocation));
     } catch {
       // Storage error ignored
-    }
-  },
-
-  geocodeAndSetLocation: async (searchQuery: string) => {
-    const cleanQuery = sanitizeAreaName(searchQuery);
-    if (!cleanQuery) {
-      return { success: false, error: 'Please enter a valid area or address.' };
-    }
-
-    set({ isDetecting: true, errorMsg: null });
-    try {
-      const results = await Location.geocodeAsync(cleanQuery);
-      if (!results || results.length === 0) {
-        const error = `No matches found for "${cleanQuery}". Try another area.`;
-        set({ isDetecting: false, errorMsg: error });
-        return { success: false, error };
-      }
-
-      const { latitude, longitude } = results[0];
-      let resolvedName = cleanQuery;
-      let fullAddr = cleanQuery;
-
-      try {
-        const rev = await Location.reverseGeocodeAsync({ latitude, longitude });
-        if (rev && rev.length > 0) {
-          resolvedName = resolveNeighborhood(rev[0]);
-          fullAddr = [sanitizeAreaName(rev[0].street), resolvedName].filter(Boolean).join(', ');
-        }
-      } catch {
-        // Keep cleanQuery
-      }
-
-      const newLocation: UserLocation = {
-        name: resolvedName,
-        formattedAddress: fullAddr || resolvedName,
-        latitude,
-        longitude,
-        isAutoDetected: false,
-        updatedAt: new Date().toISOString(),
-      };
-
-      set({
-        currentLocation: newLocation,
-        isDetecting: false,
-        errorMsg: null,
-      });
-
-      await SecureStore.setItemAsync(LOCATION_STORAGE_KEY, JSON.stringify(newLocation));
-      return { success: true, location: newLocation };
-    } catch (err: any) {
-      const error = err?.message || 'Geocoding failed. Please select from the list.';
-      set({ isDetecting: false, errorMsg: error });
-      return { success: false, error };
     }
   },
 

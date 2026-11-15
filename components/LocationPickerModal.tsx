@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,12 +18,16 @@ import {
   Search,
   Check,
   X,
-  Sparkles,
   AlertCircle,
-  ArrowRight,
+  Clock,
+  Compass,
 } from 'lucide-react-native';
 import { Palette } from '../constants/Colors';
-import { useLocationStore, POPULAR_AREAS, UserLocation } from '../store/useLocationStore';
+import {
+  useLocationStore,
+  UserLocation,
+  AddressSuggestion,
+} from '../store/useLocationStore';
 
 interface LocationPickerModalProps {
   visible: boolean;
@@ -39,18 +43,54 @@ export function LocationPickerModal({
   const {
     currentLocation,
     isDetecting,
+    isLoadingSuggestions,
+    suggestions,
     errorMsg,
     detectCurrentLocation,
-    setManualLocation,
-    geocodeAndSetLocation,
+    fetchAddressSuggestions,
+    clearSuggestions,
+    selectLocation,
     clearError,
   } = useLocationStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleDetect = async () => {
+  // Debounced address suggestion fetching as user types
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      clearSuggestions();
+      return;
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      fetchAddressSuggestions(query);
+    }, 280);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchQuery, fetchAddressSuggestions, clearSuggestions]);
+
+  // Clean up on modal open/close
+  useEffect(() => {
+    if (visible) {
+      setSearchQuery('');
+      setLocalError(null);
+      clearError();
+      clearSuggestions();
+    }
+  }, [visible, clearError, clearSuggestions]);
+
+  const handleDetectGPS = async () => {
     setLocalError(null);
     clearError();
     const res = await detectCurrentLocation();
@@ -62,36 +102,29 @@ export function LocationPickerModal({
     }
   };
 
-  const handleSelectArea = async (areaName: string) => {
+  const handleSelectSuggestion = async (item: AddressSuggestion) => {
     setLocalError(null);
     clearError();
-    await setManualLocation(areaName);
-    const updated: UserLocation = {
-      name: areaName,
-      formattedAddress: areaName,
+
+    await selectLocation({
+      name: item.shortName,
+      formattedAddress: item.fullAddress,
+      latitude: item.latitude,
+      longitude: item.longitude,
+      isAutoDetected: false,
+    });
+
+    const chosen: UserLocation = {
+      name: item.shortName,
+      formattedAddress: item.fullAddress,
+      latitude: item.latitude,
+      longitude: item.longitude,
       isAutoDetected: false,
       updatedAt: new Date().toISOString(),
     };
-    onLocationSelected?.(updated);
+
+    onLocationSelected?.(chosen);
     onClose();
-  };
-
-  const handleSearchSubmit = async () => {
-    if (!searchQuery.trim()) return;
-    setLocalError(null);
-    clearError();
-    setIsSearching(true);
-
-    const res = await geocodeAndSetLocation(searchQuery.trim());
-    setIsSearching(false);
-
-    if (res.success && res.location) {
-      setSearchQuery('');
-      onLocationSelected?.(res.location);
-      onClose();
-    } else if (res.error) {
-      setLocalError(res.error);
-    }
   };
 
   const displayError = localError || errorMsg;
@@ -100,7 +133,7 @@ export function LocationPickerModal({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
@@ -110,7 +143,7 @@ export function LocationPickerModal({
         <Pressable style={styles.backdrop} onPress={onClose} />
 
         <View style={styles.sheetContainer}>
-          {/* Grab Bar */}
+          {/* Grab Handle */}
           <View style={styles.grabBarWrap}>
             <View style={styles.grabBar} />
           </View>
@@ -123,7 +156,7 @@ export function LocationPickerModal({
               </View>
               <View>
                 <Text style={styles.headerTitle}>Select Location</Text>
-                <Text style={styles.headerSub}>Find dates & experiences near you</Text>
+                <Text style={styles.headerSub}>Find experiences & venues near you</Text>
               </View>
             </View>
 
@@ -153,7 +186,7 @@ export function LocationPickerModal({
             {/* GPS Auto-Detect Button */}
             <TouchableOpacity
               style={styles.detectBtn}
-              onPress={handleDetect}
+              onPress={handleDetectGPS}
               disabled={isDetecting}
               activeOpacity={0.85}
             >
@@ -166,106 +199,121 @@ export function LocationPickerModal({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.detectTitle}>
-                  {isDetecting ? 'Detecting Your Location...' : 'Use Current Location'}
+                  {isDetecting ? 'Detecting Location...' : 'Use Current Location'}
                 </Text>
                 <Text style={styles.detectSub}>
                   {isDetecting
-                    ? 'Using GPS & Geocoding to locate your area'
-                    : 'Tap to automatically detect your neighborhood via GPS'}
+                    ? 'Acquiring GPS coordinates & reverse geocoding...'
+                    : 'Auto-detect via GPS and find nearby tables'}
                 </Text>
               </View>
-              <Sparkles size={16} color={Palette.champagne} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
 
-            {/* Search or Type Address Box */}
+            {/* Address Search Input */}
             <View style={styles.searchSection}>
-              <Text style={styles.sectionLabel}>Or Search Neighborhood</Text>
+              <Text style={styles.sectionLabel}>Search Address or Neighborhood</Text>
               <View style={styles.searchBox}>
                 <Search size={16} color={Palette.mutedText} style={{ marginRight: 8 }} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="e.g. Ikoyi, Victoria Island, Ikeja..."
+                  placeholder="Type street, landmark or area..."
                   placeholderTextColor={Palette.mutedText}
                   value={searchQuery}
                   onChangeText={(t) => {
                     setSearchQuery(t);
                     if (displayError) setLocalError(null);
                   }}
-                  onSubmitEditing={handleSearchSubmit}
-                  returnKeyType="search"
                   autoCapitalize="words"
+                  autoCorrect={false}
                 />
-                {searchQuery.trim().length > 0 && (
+                {isLoadingSuggestions && (
+                  <ActivityIndicator size="small" color={Palette.mulberry} style={{ marginRight: 6 }} />
+                )}
+                {searchQuery.length > 0 && !isLoadingSuggestions && (
                   <TouchableOpacity
-                    style={styles.searchSubmitBtn}
-                    onPress={handleSearchSubmit}
-                    disabled={isSearching}
-                    activeOpacity={0.8}
+                    onPress={() => {
+                      setSearchQuery('');
+                      clearSuggestions();
+                    }}
+                    hitSlop={8}
                   >
-                    {isSearching ? (
-                      <ActivityIndicator size="small" color={Palette.porcelain} />
-                    ) : (
-                      <ArrowRight size={14} color={Palette.porcelain} />
-                    )}
+                    <X size={15} color={Palette.mutedText} />
                   </TouchableOpacity>
                 )}
               </View>
             </View>
 
-            {/* Curated Popular Areas */}
-            <View style={styles.popularSection}>
-              <Text style={styles.sectionLabel}>Popular Areas</Text>
-              <View style={styles.areasGrid}>
-                {POPULAR_AREAS.map((area) => {
-                  const isSelected =
-                    currentLocation.name.toLowerCase() === area.toLowerCase();
-
-                  return (
-                    <TouchableOpacity
-                      key={area}
-                      style={[
-                        styles.areaChip,
-                        isSelected && styles.areaChipSelected,
-                      ]}
-                      onPress={() => handleSelectArea(area)}
-                      activeOpacity={0.8}
-                    >
-                      {isSelected ? (
-                        <Check size={14} color={Palette.porcelain} style={{ marginRight: 5 }} />
-                      ) : (
-                        <MapPin size={12} color={Palette.mutedText} style={{ marginRight: 5 }} />
-                      )}
-                      <Text
-                        style={[
-                          styles.areaChipText,
-                          isSelected && styles.areaChipTextSelected,
-                        ]}
-                      >
-                        {area}
+            {/* Live Autocomplete Suggestions List */}
+            {suggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <Text style={styles.suggestionsHeader}>Suggested Addresses</Text>
+                {suggestions.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.suggestionRow}
+                    onPress={() => handleSelectSuggestion(item)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={styles.suggestionIconWrap}>
+                      <MapPin size={15} color={Palette.mulberry} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.suggestionPrimary} numberOfLines={1}>
+                        {item.primaryText}
                       </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                      {item.secondaryText ? (
+                        <Text style={styles.suggestionSecondary} numberOfLines={1}>
+                          {item.secondaryText}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </View>
+            )}
 
-            {/* Active Saved Location Card */}
-            <View style={styles.currentCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.currentCardLabel}>CURRENTLY SAVED</Text>
-                <Text style={styles.currentCardName}>{currentLocation.name}</Text>
-                {currentLocation.formattedAddress &&
-                  currentLocation.formattedAddress !== currentLocation.name && (
-                    <Text style={styles.currentCardAddr} numberOfLines={1}>
-                      {currentLocation.formattedAddress}
-                    </Text>
-                  )}
+            {/* Empty State when typing but no results */}
+            {searchQuery.trim().length >= 3 && !isLoadingSuggestions && suggestions.length === 0 && (
+              <View style={styles.emptySuggestions}>
+                <Text style={styles.emptySuggestionsTitle}>No address matches found</Text>
+                <Text style={styles.emptySuggestionsSub}>
+                  Try typing a specific street name, landmark, or neighborhood.
+                </Text>
               </View>
-              {currentLocation.isAutoDetected && (
-                <View style={styles.gpsBadge}>
-                  <Text style={styles.gpsBadgeText}>GPS Verified</Text>
+            )}
+
+            {/* Currently Saved Location Card (Complete with Coordinates & Full Address) */}
+            <View style={styles.savedSection}>
+              <Text style={styles.sectionLabel}>Currently Saved Location</Text>
+              <View style={styles.currentCard}>
+                <View style={styles.currentCardTop}>
+                  <View style={styles.currentCardHeaderLeft}>
+                    <Compass size={14} color={Palette.mulberry} style={{ marginRight: 6 }} />
+                    <Text style={styles.currentCardTitle}>{currentLocation.name}</Text>
+                  </View>
+                  {currentLocation.isAutoDetected ? (
+                    <View style={styles.gpsBadge}>
+                      <Text style={styles.gpsBadgeText}>GPS Active</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.manualBadge}>
+                      <Text style={styles.manualBadgeText}>Saved Address</Text>
+                    </View>
+                  )}
                 </View>
-              )}
+
+                {/* Full Address */}
+                <Text style={styles.currentCardFullAddress}>
+                  {currentLocation.formattedAddress || currentLocation.name}
+                </Text>
+
+                {/* Coordinates Row */}
+                <View style={styles.coordsRow}>
+                  <Text style={styles.coordsLabel}>
+                    Coordinates: {currentLocation.latitude.toFixed(4)}, {currentLocation.longitude.toFixed(4)}
+                  </Text>
+                </View>
+              </View>
             </View>
           </ScrollView>
         </View>
@@ -287,7 +335,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.porcelain,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '88%',
+    maxHeight: '90%',
     paddingBottom: Platform.OS === 'ios' ? 36 : 24,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -410,7 +458,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   searchSection: {
-    marginBottom: 18,
+    marginBottom: 14,
   },
   sectionLabel: {
     fontSize: 11,
@@ -426,8 +474,8 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.card,
     borderRadius: 14,
     paddingHorizontal: 12,
-    height: 46,
-    borderWidth: 1,
+    height: 48,
+    borderWidth: 1.5,
     borderColor: Palette.border,
   },
   searchInput: {
@@ -436,77 +484,131 @@ const styles = StyleSheet.create({
     color: Palette.aubergine,
     paddingVertical: 0,
   },
-  searchSubmitBtn: {
-    backgroundColor: Palette.aubergine,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 6,
-  },
-  popularSection: {
-    marginBottom: 18,
-  },
-  areasGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  areaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  suggestionsContainer: {
     backgroundColor: Palette.card,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Palette.border,
+    paddingVertical: 6,
+    marginBottom: 18,
+    shadowColor: Palette.aubergine,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  areaChipSelected: {
-    backgroundColor: Palette.aubergine,
-    borderColor: Palette.aubergine,
+  suggestionsHeader: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: Palette.mutedText,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
-  areaChipText: {
-    fontSize: 12.5,
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderTopWidth: 1,
+    borderTopColor: Palette.border,
+  },
+  suggestionIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Palette.porcelain,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  suggestionPrimary: {
+    fontSize: 13.5,
     fontWeight: '700',
     color: Palette.aubergine,
   },
-  areaChipTextSelected: {
-    color: Palette.porcelain,
-  },
-  currentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Palette.card,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    marginTop: 4,
-  },
-  currentCardLabel: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    color: Palette.mulberry,
-    marginBottom: 2,
-  },
-  currentCardName: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: Palette.aubergine,
-  },
-  currentCardAddr: {
+  suggestionSecondary: {
     fontSize: 11.5,
     color: Palette.mutedText,
     marginTop: 2,
   },
+  emptySuggestions: {
+    backgroundColor: Palette.card,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  emptySuggestionsTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: Palette.aubergine,
+    marginBottom: 4,
+  },
+  emptySuggestionsSub: {
+    fontSize: 12,
+    color: Palette.mutedText,
+    textAlign: 'center',
+  },
+  savedSection: {
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  currentCard: {
+    backgroundColor: Palette.card,
+    padding: 15,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: Palette.border,
+    shadowColor: Palette.aubergine,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  currentCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  currentCardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  currentCardTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Palette.aubergine,
+  },
+  currentCardFullAddress: {
+    fontSize: 12.5,
+    color: Palette.mutedText,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  coordsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Palette.border,
+  },
+  coordsLabel: {
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: Palette.mulberry,
+    fontWeight: '600',
+  },
   gpsBadge: {
     backgroundColor: Palette.champagne,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#d6b783',
@@ -515,5 +617,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#2E1805',
+  },
+  manualBadge: {
+    backgroundColor: Palette.secondaryBg,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Palette.border,
+  },
+  manualBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Palette.aubergine,
   },
 });

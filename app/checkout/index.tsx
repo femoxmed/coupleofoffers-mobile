@@ -20,7 +20,6 @@ import {
   ArrowLeft,
   X,
   ExternalLink,
-  Sparkles,
   Calendar,
   Users,
   MapPin,

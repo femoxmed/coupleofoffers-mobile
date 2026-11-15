@@ -24,7 +24,6 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Sparkles,
   Store,
   ShieldCheck,
   ArrowRight,
@@ -89,7 +88,7 @@ export default function ProfileScreen() {
       icon: Heart,
       label: 'Saved Experiences',
       badge: savedOffers.length > 0 ? `${savedOffers.length}` : undefined,
-      onPress: () => router.push('/(tabs)/saved' as any),
+      onPress: () => router.push('/saved' as any),
     },
     {
       icon: Bell,
@@ -266,7 +265,7 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <View style={styles.badgeRow}>
-              <Sparkles size={12} color={Palette.goldInk} style={{ marginRight: 4 }} />
+              <ShieldCheck size={12} color={Palette.goldInk} style={{ marginRight: 4 }} />
               <Text style={styles.pilotBadgeText}>VIP Booker</Text>
             </View>
           )}

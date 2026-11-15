@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, X, Sparkles, ShieldCheck } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, X, ShieldCheck } from 'lucide-react-native';
 import { Palette } from '../constants/Colors';
 import { BrandWordmark } from '../components/BrandWordmark';
 import { useAuthStore } from '../store/useAuthStore';
