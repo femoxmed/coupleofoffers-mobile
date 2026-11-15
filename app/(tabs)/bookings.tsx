@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Calendar,
   CheckCircle2,
@@ -36,6 +37,7 @@ import {
   Send,
   Ticket,
   Check,
+  Bell,
 } from 'lucide-react-native';
 import { Palette } from '../../constants/Colors';
 import { formatNaira } from '../../constants/config';
@@ -83,6 +85,7 @@ export default function BookingsScreen() {
   const [rescheduleBooking, setRescheduleBooking] = useState<ConfirmedBooking | null>(null);
   const [refundBooking, setRefundBooking] = useState<ConfirmedBooking | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [helpBookingRef, setHelpBookingRef] = useState<string | undefined>(undefined);
 
   const loadBookings = useCallback(async () => {
@@ -156,7 +159,7 @@ export default function BookingsScreen() {
   // 1. UNLOGGED IN: Prompt User to Sign In (Optically centered above floating nav)
   if (!user) {
     return (
-      <View style={styles.unauthContainer}>
+      <SafeAreaView style={styles.unauthContainer} edges={['top']}>
         <View style={styles.unauthContent}>
           <View style={styles.unauthIconCircle}>
             <Calendar size={38} color={Palette.mulberry} strokeWidth={2.2} />
@@ -185,12 +188,12 @@ export default function BookingsScreen() {
             <Text style={styles.signUpSecondaryBtnText}>Create Free Account</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Header Row with Help & Concierge Pill */}
       <View style={styles.headerBar}>
         <View style={{ flex: 1 }}>
@@ -200,17 +203,36 @@ export default function BookingsScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.helpButton}
-          onPress={() => {
-            setHelpBookingRef(undefined);
-            setIsHelpOpen(true);
-          }}
-          activeOpacity={0.82}
-        >
-          <HelpCircle size={15} color={Palette.aubergine} style={{ marginRight: 5 }} />
-          <Text style={styles.helpButtonText}>Help</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={styles.notifHeaderBtn}
+            onPress={() => setIsNotifOpen(true)}
+            activeOpacity={0.82}
+            accessibilityLabel="Notifications"
+            accessibilityRole="button"
+          >
+            <Bell size={16} color={Palette.aubergine} />
+            {upcomingBookings.length > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>
+                  {upcomingBookings.length > 9 ? '9+' : upcomingBookings.length}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={() => {
+              setHelpBookingRef(undefined);
+              setIsHelpOpen(true);
+            }}
+            activeOpacity={0.82}
+          >
+            <HelpCircle size={15} color={Palette.aubergine} style={{ marginRight: 5 }} />
+            <Text style={styles.helpButtonText}>Help</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 3 Subtabs: Upcoming | Past | Refunds */}
@@ -662,6 +684,113 @@ export default function BookingsScreen() {
       </Modal>
 
       {/* ========================================================= */}
+      {/* NOTIFICATIONS MODAL                                       */}
+      {/* ========================================================= */}
+      <Modal
+        visible={isNotifOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsNotifOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxHeight: '85%' }]}>
+            <View style={styles.modalHandleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
+
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.notifModalIconWrap}>
+                  <Bell size={18} color={Palette.aubergine} />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>Notifications & Alerts</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Table passes, arrival codes & date reminders
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setIsNotifOpen(false)}
+                activeOpacity={0.7}
+              >
+                <X size={16} color={Palette.mutedText} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 28 }}>
+              {upcomingBookings.length > 0 ? (
+                upcomingBookings.map((b) => (
+                  <View key={b.reference} style={styles.notifCard}>
+                    <View style={styles.notifCardTop}>
+                      <View style={styles.notifBadgeWrap}>
+                        <CheckCircle2 size={13} color="#FFFFFF" />
+                        <Text style={styles.notifBadgeLabel}>Table Confirmed</Text>
+                      </View>
+                      <Text style={styles.notifRefText}>
+                        Ref: {b.reference.slice(-10).toUpperCase()}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.notifOfferTitle}>{b.offerTitle}</Text>
+                    <Text style={styles.notifVenueText}>
+                      {b.venueName} • Table for {b.partySize}
+                    </Text>
+
+                    <View style={styles.notifPinBanner}>
+                      <View>
+                        <Text style={styles.notifPinBannerLabel}>Your Arrival Code</Text>
+                        <Text style={styles.notifPinBannerCode}>{b.arrivalPin}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.notifViewPassBtn}
+                        onPress={() => {
+                          setIsNotifOpen(false);
+                          setSelectedVoucher(b);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.notifViewPassBtnText}>View Pass →</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.notifEmptyWrap}>
+                  <Bell size={32} color={Palette.mutedText} style={{ opacity: 0.6, marginBottom: 8 }} />
+                  <Text style={styles.notifEmptyTitle}>No Unread Notifications</Text>
+                  <Text style={styles.notifEmptySub}>
+                    When you book an experience, your guaranteed table confirmation and 4-digit arrival code will appear here.
+                  </Text>
+                </View>
+              )}
+
+              {/* General Reminder Alert */}
+              <View style={styles.notifGeneralCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Clock size={14} color={Palette.mulberry} />
+                  <Text style={styles.notifGeneralTitle}>24h & 2h Arrival Alerts</Text>
+                </View>
+                <Text style={styles.notifGeneralBody}>
+                  Automatic SMS and push alerts are sent before your scheduled date so your table is always waiting.
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.notifDoneBtn}
+                onPress={() => setIsNotifOpen(false)}
+                activeOpacity={0.88}
+              >
+                <Text style={styles.notifDoneBtnText}>Dismiss</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================= */}
       {/* MODAL 2: RESCHEDULE DIALOG                                */}
       {/* ========================================================= */}
       <RescheduleModal
@@ -696,7 +825,7 @@ export default function BookingsScreen() {
         userEmail={user.email}
         userName={user.name}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -2515,6 +2644,188 @@ const styles = StyleSheet.create({
   signUpSecondaryBtnText: {
     color: Palette.mulberry,
     fontSize: 13.5,
+    fontWeight: '700',
+  },
+
+  // Notifications Header Button & Modal Styles
+  notifHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Palette.card,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    shadowColor: Palette.aubergine,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    backgroundColor: Palette.champagne,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#d6b783',
+  },
+  notifBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#2E1805',
+  },
+  notifModalIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Palette.secondaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifCard: {
+    backgroundColor: Palette.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    shadowColor: Palette.aubergine,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  notifCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  notifBadgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Palette.mulberry,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  notifBadgeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  notifRefText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.mutedText,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  notifOfferTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    marginBottom: 2,
+  },
+  notifVenueText: {
+    fontSize: 12.5,
+    color: Palette.mutedText,
+    marginBottom: 12,
+  },
+  notifPinBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Palette.champagne,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  notifPinBannerLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    color: '#2E1805',
+    opacity: 0.8,
+    textTransform: 'uppercase',
+  },
+  notifPinBannerCode: {
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 3,
+    color: '#2E1805',
+  },
+  notifViewPassBtn: {
+    backgroundColor: Palette.aubergine,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  notifViewPassBtnText: {
+    color: Palette.porcelain,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  notifEmptyWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    backgroundColor: Palette.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    marginBottom: 12,
+  },
+  notifEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    marginBottom: 4,
+  },
+  notifEmptySub: {
+    fontSize: 12.5,
+    color: Palette.mutedText,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  notifGeneralCard: {
+    backgroundColor: Palette.secondaryBg,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    marginBottom: 16,
+  },
+  notifGeneralTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: Palette.aubergine,
+  },
+  notifGeneralBody: {
+    fontSize: 11.5,
+    color: Palette.mutedText,
+    lineHeight: 16,
+  },
+  notifDoneBtn: {
+    backgroundColor: Palette.aubergine,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifDoneBtnText: {
+    color: Palette.porcelain,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

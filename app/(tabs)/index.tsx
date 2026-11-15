@@ -19,9 +19,11 @@ import {
   ShieldCheck,
   Heart,
   Store,
+  Bell,
 } from 'lucide-react-native';
 import { Palette } from '../../constants/Colors';
 import { catalogService, DEMO_PARTNERS, WEB_HOMEPAGE_SLIDES } from '../../services/catalog';
+import { checkoutService } from '../../services/checkoutService';
 import { useSavedStore } from '../../store/useSavedStore';
 import { Image } from 'expo-image';
 import { resolveImageSource } from '../../constants/images';
@@ -75,10 +77,28 @@ export default function HomeScreen() {
     queryFn: () => catalogService.getOffers(),
   });
 
+  // 4. Fetch Bookings for Notifications Count
+  const { data: bookings, refetch: refetchBookings } = useQuery({
+    queryKey: ['bookings'],
+    queryFn: async () => {
+      try {
+        return await checkoutService.getBookings();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const upcomingCount = useMemo(() => {
+    if (!bookings || !Array.isArray(bookings)) return 0;
+    return bookings.filter((b) => b.status === 'confirmed').length;
+  }, [bookings]);
+
   const onRefreshAll = () => {
     refetchSlides();
     refetchPartners();
     refetchOffers();
+    refetchBookings();
   };
 
   const handleSearchSubmit = () => {
@@ -122,7 +142,7 @@ export default function HomeScreen() {
         {/* Left: Web App Wordmark Logo + Slogan below it */}
         <BrandLogo height={28} showSlogan={true} />
 
-        {/* Right: User's location pill + Saved wishlist */}
+        {/* Right: User's location pill + Saved wishlist + Notifications Bell */}
         <View style={styles.mastheadRight}>
           <TouchableOpacity style={styles.locationPill} activeOpacity={0.8}>
             <MapPin size={11} color={Palette.mulberry} style={{ marginRight: 3 }} />
@@ -135,11 +155,27 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/saved')}
             activeOpacity={0.8}
             accessibilityLabel="Saved experiences"
+            accessibilityRole="button"
           >
             <Heart size={16} color={Palette.aubergine} />
             {savedCount > 0 && (
               <View style={styles.savedBadge}>
-                <Text style={styles.savedBadgeText}>{savedCount}</Text>
+                <Text style={styles.savedBadgeText}>{savedCount > 9 ? '9+' : savedCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.notifButton}
+            onPress={() => router.push('/(tabs)/bookings')}
+            activeOpacity={0.8}
+            accessibilityLabel="Notifications"
+            accessibilityRole="button"
+          >
+            <Bell size={16} color={Palette.aubergine} />
+            {upcomingCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{upcomingCount > 9 ? '9+' : upcomingCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -397,6 +433,36 @@ const styles = StyleSheet.create({
     color: Palette.porcelain,
     fontSize: 9,
     fontWeight: '800',
+  },
+  notifButton: {
+    position: 'relative',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Palette.card,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: Palette.champagne,
+    borderRadius: 8.5,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#d6b783',
+  },
+  notifBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#2E1805',
   },
   scrollContent: {
     paddingBottom: 130,

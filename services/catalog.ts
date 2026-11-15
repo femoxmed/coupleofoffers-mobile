@@ -67,7 +67,7 @@ export const DEMO_PARTNERS: Partner[] = [
 
 export const DEMO_OFFERS: Offer[] = [
   {
-    id: 'offer-1',
+    id: '78974a3a-f7ab-4b43-ae23-6b446df553d5',
     title: 'Suya night in Lekki',
     slug: 'suya-night-in-lekki',
     category: 'dining',
@@ -95,7 +95,7 @@ export const DEMO_OFFERS: Offer[] = [
     time_window: '6:00 PM – 11:00 PM',
   },
   {
-    id: 'offer-2',
+    id: 'd439eb0c-0b88-4e66-b5ac-022ce1e1f399',
     title: 'A slow afternoon at the spa',
     slug: 'a-slow-afternoon-at-the-spa',
     category: 'spa',
@@ -123,7 +123,7 @@ export const DEMO_OFFERS: Offer[] = [
     time_window: '11:00 AM – 7:00 PM',
   },
   {
-    id: 'offer-3',
+    id: '9c06fb18-3382-48b2-a4e2-f7a3644d5ed3',
     title: 'Arcade night for two',
     slug: 'arcade-night-for-two',
     category: 'gaming',
@@ -151,7 +151,7 @@ export const DEMO_OFFERS: Offer[] = [
     time_window: '2:00 PM – 10:00 PM',
   },
   {
-    id: 'offer-4',
+    id: '829b3c85-41d2-47a8-a664-0c82a9cf63d7',
     title: 'The long lunch',
     slug: 'the-long-lunch',
     category: 'dining',
@@ -179,7 +179,7 @@ export const DEMO_OFFERS: Offer[] = [
     time_window: '12:00 PM – 4:00 PM',
   },
   {
-    id: 'offer-5',
+    id: '203e7fa5-8e28-4974-85f2-5dab3b622801',
     title: 'Supper on the terrace',
     slug: 'supper-on-the-terrace',
     category: 'dining',
@@ -207,7 +207,7 @@ export const DEMO_OFFERS: Offer[] = [
     time_window: '7:00 PM – 11:00 PM',
   },
   {
-    id: 'offer-6',
+    id: 'd839376c-a5d9-40a5-b650-3b4854135b22',
     title: 'The charcoal grill platter',
     slug: 'the-charcoal-grill-platter',
     category: 'dining',
@@ -235,7 +235,7 @@ export const DEMO_OFFERS: Offer[] = [
     time_window: '5:00 PM – 11:00 PM',
   },
   {
-    id: 'offer-7',
+    id: 'ed0e99c7-2632-4c22-ab7d-eee0119b83df',
     title: 'The lantern supper',
     slug: 'the-lantern-supper',
     category: 'dining',
@@ -520,9 +520,30 @@ export const catalogService = {
    * Toggle save offer
    */
   async toggleSaveOffer(id: string, save: boolean): Promise<void> {
-    await apiClient(`/api/v1/account/saved/${id}`, {
-      method: save ? 'PUT' : 'DELETE',
-    });
+    // Map legacy demo IDs if present
+    const demoMap: Record<string, string> = {
+      'offer-1': '78974a3a-f7ab-4b43-ae23-6b446df553d5',
+      'offer-2': 'd439eb0c-0b88-4e66-b5ac-022ce1e1f399',
+      'offer-3': '9c06fb18-3382-48b2-a4e2-f7a3644d5ed3',
+      'offer-4': '829b3c85-41d2-47a8-a664-0c82a9cf63d7',
+      'offer-5': '203e7fa5-8e28-4974-85f2-5dab3b622801',
+      'offer-6': 'd839376c-a5d9-40a5-b650-3b4854135b22',
+      'offer-7': 'ed0e99c7-2632-4c22-ab7d-eee0119b83df',
+    };
+    const targetId = demoMap[id] || id;
+
+    try {
+      await apiClient(`/api/v1/account/saved/${targetId}`, {
+        method: save ? 'PUT' : 'DELETE',
+      });
+    } catch (err: any) {
+      // If unauthenticated or backend unavailable, let caller know but don't crash
+      if (err?.message?.includes('Unauthorized') || err?.message?.includes('Not Found')) {
+        // Expected when user is browsing as a guest without an account token
+        return;
+      }
+      throw err;
+    }
   },
 
   /**

@@ -61,7 +61,7 @@ export default function TabLayout() {
         name="bookings"
         options={{
           title: 'Bookings',
-          headerTitle: 'Your Bookings',
+          headerShown: false,
         }}
       />
 
