@@ -1,0 +1,40 @@
+export const Palette = {
+  aubergine: '#301D32',
+  porcelain: '#FAF5ED',
+  mulberry: '#743D60',
+  champagne: '#E5C99A',
+  goldInk: '#806020',
+  secondaryBg: '#EFE3E7',
+  card: '#FFFCF7',
+  border: '#DDD0C8',
+  muted: '#F3EDE6',
+  mutedText: '#695A63',
+  tint: '#743D60',
+};
+
+export default {
+  light: {
+    text: Palette.aubergine,
+    background: Palette.porcelain,
+    tint: Palette.mulberry,
+    tabIconDefault: '#A89AA0',
+    tabIconSelected: Palette.mulberry,
+    card: Palette.card,
+    border: Palette.border,
+    muted: Palette.muted,
+    mutedText: Palette.mutedText,
+    accent: Palette.champagne,
+  },
+  dark: {
+    text: '#F6EDE6',
+    background: '#1C151D',
+    tint: Palette.champagne,
+    tabIconDefault: '#695663',
+    tabIconSelected: Palette.champagne,
+    card: '#291F29',
+    border: '#4B3B48',
+    muted: '#312531',
+    mutedText: '#C6B6BE',
+    accent: Palette.champagne,
+  },
+};

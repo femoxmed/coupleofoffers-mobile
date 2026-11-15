@@ -1,0 +1,444 @@
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { Heart, Users, MapPin } from 'lucide-react-native';
+import { Palette } from '../constants/Colors';
+import { formatNaira, Config } from '../constants/config';
+import { resolveImageSource, LOCAL_ASSETS } from '../constants/images';
+import { useSavedStore } from '../store/useSavedStore';
+import type { Offer } from '../types';
+
+interface OfferCardProps {
+  offer: Offer;
+  layout?: 'compact' | 'featured';
+}
+
+export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
+  const router = useRouter();
+  const { isSaved, toggleSave } = useSavedStore();
+  const saved = isSaved(offer.id);
+
+  const imageSource = resolveImageSource(offer.image_url, Config.FALLBACK_OFFER_IMAGE);
+
+  const handleCardPress = () => {
+    router.push(`/offer/${offer.id}`);
+  };
+
+  const handleHeartPress = () => {
+    toggleSave({
+      id: offer.id,
+      title: offer.title,
+      slug: offer.slug,
+      venue_name: offer.venue_name || offer.venue,
+      price_kobo: offer.price_kobo,
+      party_size: offer.party_size,
+      image_url: offer.image_url,
+    });
+  };
+
+  const hasDiscount =
+    offer.regular_price_kobo && offer.regular_price_kobo > offer.price_kobo;
+
+  const cleanAddress = (offer.street_address || '')
+    .replace(/,\s*Lagos/gi, '')
+    .replace(/Lagos/gi, '')
+    .replace(/,\s*Nigeria/gi, '')
+    .replace(/[\s•\-–—]*demo\b/gi, '')
+    .trim();
+
+  const cleanVenueName = (offer.venue_name || offer.venue || '')
+    .replace(/Sample\s*Lagos\s*experiences/gi, 'Curated Experiences')
+    .replace(/,\s*Lagos/gi, '')
+    .replace(/Lagos/gi, '')
+    .replace(/[\s•\-–—]*demo\b/gi, '')
+    .trim() || 'Curated Venue';
+
+  // If the restaurant allows more than 2, then 'For 2' becomes 'From 2'
+  const allowsMoreThanTwo =
+    (offer.max_party_size || 0) > 2 ||
+    (offer.extra_friend_price_kobo || 0) > 0;
+
+  const partyBadgeLabel =
+    offer.party_size === 2
+      ? allowsMoreThanTwo
+        ? 'From 2'
+        : 'For 2'
+      : allowsMoreThanTwo
+      ? `From ${offer.party_size}`
+      : `Party of ${offer.party_size}`;
+
+  // Compact Modern Card Layout (horizontal, sleek, luxury)
+  if (layout === 'compact') {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={handleCardPress}
+        style={styles.compactCard}
+      >
+        {/* Left: 110x110 Image */}
+        <View style={styles.compactImageWrapper}>
+          <Image
+            source={imageSource}
+            placeholder={LOCAL_ASSETS['dining-room.jpg']}
+            style={styles.compactImage}
+            contentFit="cover"
+            transition={300}
+          />
+          <Pressable
+            hitSlop={8}
+            onPress={handleHeartPress}
+            style={styles.compactHeartButton}
+          >
+            <Heart
+              size={14}
+              color={saved ? '#E0245E' : Palette.aubergine}
+              fill={saved ? '#E0245E' : 'transparent'}
+            />
+          </Pressable>
+
+          <View style={styles.compactPartyBadge}>
+            <Text style={styles.compactPartyBadgeText}>
+              {partyBadgeLabel}
+            </Text>
+          </View>
+        </View>
+
+        {/* Right: Info */}
+        <View style={styles.compactContent}>
+          <View style={styles.venueRow}>
+            <MapPin size={11} color={Palette.mulberry} style={{ marginRight: 3 }} />
+            <Text style={styles.venueText} numberOfLines={1}>
+              {cleanVenueName}{cleanAddress ? ` • ${cleanAddress}` : ''}
+            </Text>
+          </View>
+
+          <Text style={styles.compactTitle} numberOfLines={2}>
+            {offer.title}
+          </Text>
+
+          {offer.inclusions ? (
+            <Text style={styles.compactInclusions} numberOfLines={1}>
+              {offer.inclusions.replace(/\n/g, ' • ')}
+            </Text>
+          ) : null}
+
+          <View style={styles.compactFooter}>
+            <View style={styles.priceRow}>
+              <Text style={styles.compactPrice}>{formatNaira(offer.price_kobo)}</Text>
+              {hasDiscount ? (
+                <Text style={styles.compactRegularPrice}>
+                  {formatNaira(offer.regular_price_kobo)}
+                </Text>
+              ) : null}
+            </View>
+
+            <View style={styles.compactBookPill}>
+              <Text style={styles.compactBookPillText}>Book Offer</Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // Featured Large Card Layout (for top hero highlights)
+  return (
+    <TouchableOpacity
+      activeOpacity={0.92}
+      onPress={handleCardPress}
+      style={styles.featuredCard}
+    >
+      <View style={styles.featuredImageContainer}>
+        <Image
+          source={imageSource}
+          placeholder={LOCAL_ASSETS['terrace-evening.jpg']}
+          style={styles.featuredImage}
+          contentFit="cover"
+          transition={300}
+        />
+        <View style={styles.badgeRow}>
+          <View style={styles.leftBadges}>
+            {offer.homepage_featured && (
+              <View style={styles.featuredBadge}>
+                <Text style={styles.featuredBadgeText}>FEATURED</Text>
+              </View>
+            )}
+            <View style={styles.partyBadge}>
+              <Users size={11} color={Palette.aubergine} style={{ marginRight: 4 }} />
+              <Text style={styles.partyBadgeText}>
+                {partyBadgeLabel}
+              </Text>
+            </View>
+          </View>
+
+          <Pressable
+            hitSlop={12}
+            onPress={handleHeartPress}
+            style={styles.heartButton}
+          >
+            <Heart
+              size={16}
+              color={saved ? '#E0245E' : Palette.aubergine}
+              fill={saved ? '#E0245E' : 'transparent'}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.featuredContent}>
+        <View style={styles.venueRow}>
+          <MapPin size={12} color={Palette.mulberry} style={{ marginRight: 4 }} />
+          <Text style={styles.venueText} numberOfLines={1}>
+            {cleanVenueName}{cleanAddress ? ` • ${cleanAddress}` : ''}
+          </Text>
+        </View>
+
+        <Text style={styles.featuredTitle} numberOfLines={2}>
+          {offer.title}
+        </Text>
+
+        <View style={styles.featuredFooter}>
+          <View style={styles.priceRow}>
+            <Text style={styles.featuredPrice}>{formatNaira(offer.price_kobo)}</Text>
+            {hasDiscount ? (
+              <Text style={styles.compactRegularPrice}>
+                {formatNaira(offer.regular_price_kobo)}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.bookPill}>
+            <Text style={styles.bookPillText}>Book Offer</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  // Compact horizontal card
+  compactCard: {
+    flexDirection: 'row',
+    backgroundColor: Palette.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    padding: 10,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    alignItems: 'center',
+  },
+  compactImageWrapper: {
+    width: 105,
+    height: 105,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: Palette.muted,
+  },
+  compactImage: {
+    width: '100%',
+    height: '100%',
+  },
+  compactHeartButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255, 252, 247, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactPartyBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(48, 29, 50, 0.85)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  compactPartyBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFFCF7',
+  },
+  compactContent: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'space-between',
+    height: 105,
+    paddingVertical: 2,
+  },
+  venueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  venueText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Palette.mutedText,
+    flex: 1,
+  },
+  compactTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    letterSpacing: -0.2,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  compactInclusions: {
+    fontSize: 11,
+    color: Palette.mutedText,
+    marginTop: 2,
+  },
+  compactFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  compactPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Palette.aubergine,
+  },
+  compactRegularPrice: {
+    fontSize: 11,
+    color: Palette.mutedText,
+    textDecorationLine: 'line-through',
+  },
+  compactBookPill: {
+    backgroundColor: Palette.mulberry,
+    paddingHorizontal: 9.5,
+    paddingVertical: 4.5,
+    borderRadius: 12,
+  },
+  compactBookPillText: {
+    color: '#FFFCF7',
+    fontWeight: '700',
+    fontSize: 10.5,
+  },
+
+  // Featured large card
+  featuredCard: {
+    backgroundColor: Palette.card,
+    borderRadius: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  featuredImageContainer: {
+    height: 160,
+    width: '100%',
+    position: 'relative',
+    backgroundColor: Palette.muted,
+  },
+  featuredImage: {
+    width: '100%',
+    height: '100%',
+  },
+  badgeRow: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  leftBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  featuredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Palette.champagne,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  featuredBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Palette.goldInk,
+  },
+  partyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 252, 247, 0.95)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  partyBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.aubergine,
+  },
+  heartButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 252, 247, 0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featuredContent: {
+    padding: 14,
+  },
+  featuredTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    marginVertical: 4,
+    letterSpacing: -0.3,
+  },
+  featuredFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Palette.muted,
+    paddingTop: 10,
+  },
+  featuredPrice: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: Palette.aubergine,
+  },
+  bookPill: {
+    backgroundColor: Palette.mulberry,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  bookPillText: {
+    color: '#FFFCF7',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+});
