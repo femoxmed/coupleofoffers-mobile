@@ -3,20 +3,31 @@ import * as SecureStore from 'expo-secure-store';
 import type { SavedOffer } from '../types';
 import { catalogService } from '../services/catalog';
 
-const SAVED_STORAGE_KEY = 'coo_saved_offers_local';
+function getStorageKey(email?: string | null): string {
+  if (email && email.trim()) {
+    return `coo_saved_offers_${email.trim().toLowerCase()}`;
+  }
+  return 'coo_saved_offers_guest';
+}
 
-async function getStoredSavedOffers(): Promise<SavedOffer[]> {
+async function getStoredSavedOffers(email?: string | null): Promise<SavedOffer[]> {
   try {
-    const raw = await SecureStore.getItemAsync(SAVED_STORAGE_KEY);
+    const key = getStorageKey(email);
+    let raw = await SecureStore.getItemAsync(key);
+    // Fallback to legacy key if user key is empty
+    if (!raw && !email) {
+      raw = await SecureStore.getItemAsync('coo_saved_offers_local');
+    }
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-async function persistSavedOffers(offers: SavedOffer[]): Promise<void> {
+async function persistSavedOffers(offers: SavedOffer[], email?: string | null): Promise<void> {
   try {
-    await SecureStore.setItemAsync(SAVED_STORAGE_KEY, JSON.stringify(offers));
+    const key = getStorageKey(email);
+    await SecureStore.setItemAsync(key, JSON.stringify(offers));
   } catch {
     // Ignore storage write error
   }
@@ -26,8 +37,10 @@ interface SavedState {
   savedOffers: SavedOffer[];
   savedIds: Set<string>;
   isLoading: boolean;
-  fetchSaved: () => Promise<void>;
-  toggleSave: (offer: SavedOffer) => Promise<void>;
+  currentUserEmail?: string | null;
+  fetchSaved: (email?: string | null) => Promise<void>;
+  toggleSave: (offer: SavedOffer, email?: string | null) => Promise<void>;
+  clearSaved: (email?: string | null) => Promise<void>;
   isSaved: (id: string) => boolean;
 }
 
@@ -35,33 +48,43 @@ export const useSavedStore = create<SavedState>((set, get) => ({
   savedOffers: [],
   savedIds: new Set(),
   isLoading: false,
+  currentUserEmail: null,
 
-  fetchSaved: async () => {
-    set({ isLoading: true });
-    // First load from device SecureStore so state is instantaneous
-    const local = await getStoredSavedOffers();
-    if (local.length > 0 && get().savedOffers.length === 0) {
-      set({
-        savedOffers: local,
-        savedIds: new Set(local.map((o) => o.id)),
-      });
-    }
+  fetchSaved: async (email?: string | null) => {
+    set({ isLoading: true, currentUserEmail: email || null });
 
+    // 1. First load from user-isolated device SecureStore
+    const local = await getStoredSavedOffers(email);
+    const current = get().savedOffers;
+    const mergedInitial = new Map<string, SavedOffer>();
+    local.forEach((o) => mergedInitial.set(o.id, o));
+    current.forEach((o) => mergedInitial.set(o.id, o));
+    const combinedInitial = Array.from(mergedInitial.values());
+
+    set({
+      savedOffers: combinedInitial,
+      savedIds: new Set(combinedInitial.map((o) => o.id)),
+    });
+
+    // 2. Sync with the server API (only if authenticated user)
     try {
       const serverOffers = await catalogService.getSavedOffers();
-      if (Array.isArray(serverOffers) && serverOffers.length > 0) {
-        // Merge server offers with local offers
+      if (Array.isArray(serverOffers)) {
         const mergedMap = new Map<string, SavedOffer>();
-        local.forEach((o) => mergedMap.set(o.id, o));
+        // Prefer server state for authenticated accounts
         serverOffers.forEach((o) => mergedMap.set(o.id, o));
-        const combined = Array.from(mergedMap.values());
+        // Keep any local unpersisted
+        local.forEach((o) => {
+          if (!mergedMap.has(o.id)) mergedMap.set(o.id, o);
+        });
 
+        const combined = Array.from(mergedMap.values());
         set({
           savedOffers: combined,
           savedIds: new Set(combined.map((o) => o.id)),
           isLoading: false,
         });
-        await persistSavedOffers(combined);
+        await persistSavedOffers(combined, email);
       } else {
         set({ isLoading: false });
       }
@@ -70,7 +93,8 @@ export const useSavedStore = create<SavedState>((set, get) => ({
     }
   },
 
-  toggleSave: async (offer: SavedOffer) => {
+  toggleSave: async (offer: SavedOffer, email?: string | null) => {
+    const activeEmail = email || get().currentUserEmail;
     const { savedIds, savedOffers } = get();
     const currentlySaved = savedIds.has(offer.id);
 
@@ -86,17 +110,31 @@ export const useSavedStore = create<SavedState>((set, get) => ({
       nextOffers = [offer, ...nextOffers];
     }
 
-    // Immediately update UI and device storage
+    // Immediately update UI and user-specific storage
     set({ savedIds: nextIds, savedOffers: nextOffers });
-    await persistSavedOffers(nextOffers);
+    await persistSavedOffers(nextOffers, activeEmail);
 
-    // Sync with backend (without reverting local wishlist on error)
+    // Sync with server endpoint: /api/v1/account/saved/:id
     try {
       await catalogService.toggleSaveOffer(offer.id, !currentlySaved);
     } catch {
-      // Keep saved on device even if unauthenticated / offline
+      // Keep saved on device even if unauthenticated
     }
   },
 
-  isSaved: (id: string) => get().savedIds.has(id),
+  clearSaved: async (email?: string | null) => {
+    const activeEmail = email || get().currentUserEmail;
+    set({ savedOffers: [], savedIds: new Set(), isLoading: false, currentUserEmail: null });
+    try {
+      if (activeEmail) {
+        await SecureStore.deleteItemAsync(`coo_saved_offers_${activeEmail.trim().toLowerCase()}`);
+      }
+      await SecureStore.deleteItemAsync('coo_saved_offers_local');
+      await SecureStore.deleteItemAsync('coo_saved_offers_guest');
+    } catch {
+      // Ignore deletion errors
+    }
+  },
+
+  isSaved: (id: string) => get().savedOffers.some((o) => o.id === id),
 }));

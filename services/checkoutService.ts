@@ -55,9 +55,15 @@ export interface RescheduleSlotItem {
   capacity?: number;
 }
 
-const BOOKINGS_STORAGE_KEY = 'coo_mobile_confirmed_bookings';
+const BOOKINGS_STORAGE_PREFIX = 'coo_mobile_bookings_';
 const BACHS_SANDBOX_KEY = 'sk_sandbox_cdd16397_97a-BNCgGIkR3mBU-3PPSm7s4l4ry6uUuFRbZGHM4HM';
 const BACHS_API_URL = 'https://sandbox-api.bachs.io';
+
+function getUserStorageKey(email?: string | null): string {
+  if (!email || !email.trim()) return 'coo_mobile_bookings_guest';
+  const clean = email.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  return `${BOOKINGS_STORAGE_PREFIX}${clean}`;
+}
 
 export const checkoutService = {
   /**
@@ -154,13 +160,15 @@ export const checkoutService = {
   },
 
   /**
-   * Save a confirmed booking to local secure storage
+   * Save a confirmed booking to local secure storage strictly for the booked user
    */
-  async saveBooking(booking: ConfirmedBooking): Promise<void> {
+  async saveBooking(booking: ConfirmedBooking, userEmail?: string | null): Promise<void> {
+    const targetEmail = (userEmail || booking.email || '').trim().toLowerCase();
+    const storageKey = getUserStorageKey(targetEmail);
     try {
-      const existing = await this.getBookings();
+      const existing = await this.getBookings(targetEmail);
       const updated = [booking, ...existing.filter((b) => b.reference !== booking.reference)];
-      await SecureStore.setItemAsync(BOOKINGS_STORAGE_KEY, JSON.stringify(updated));
+      await SecureStore.setItemAsync(storageKey, JSON.stringify(updated));
     } catch (err) {
       console.error('Error saving confirmed booking:', err);
     }
@@ -169,11 +177,16 @@ export const checkoutService = {
   /**
    * Update an existing booking in local storage
    */
-  async updateBooking(reference: string, updates: Partial<ConfirmedBooking>): Promise<ConfirmedBooking[]> {
+  async updateBooking(
+    reference: string,
+    updates: Partial<ConfirmedBooking>,
+    userEmail?: string | null
+  ): Promise<ConfirmedBooking[]> {
+    const storageKey = getUserStorageKey(userEmail);
     try {
-      const existing = await this.getBookings();
+      const existing = await this.getBookings(userEmail);
       const updated = existing.map((b) => (b.reference === reference ? { ...b, ...updates } : b));
-      await SecureStore.setItemAsync(BOOKINGS_STORAGE_KEY, JSON.stringify(updated));
+      await SecureStore.setItemAsync(storageKey, JSON.stringify(updated));
       return updated;
     } catch (err) {
       console.error('Error updating booking:', err);
@@ -182,22 +195,50 @@ export const checkoutService = {
   },
 
   /**
-   * Get all user bookings: merges server bookings (if logged in) with local secure storage
+   * Clear all bookings stored on device for a user (called on logout)
    */
-  async getBookings(): Promise<ConfirmedBooking[]> {
+  async clearUserBookings(userEmail?: string | null): Promise<void> {
+    try {
+      const storageKey = getUserStorageKey(userEmail);
+      await SecureStore.deleteItemAsync(storageKey);
+      // Clean up legacy global key if present to prevent leaks
+      await SecureStore.deleteItemAsync('coo_mobile_confirmed_bookings');
+    } catch {}
+  },
+
+  /**
+   * Get all user bookings: strictly isolated per user so data never leaks to other users
+   */
+  async getBookings(currentUserEmail?: string | null): Promise<ConfirmedBooking[]> {
+    const normUserEmail = currentUserEmail ? currentUserEmail.trim().toLowerCase() : null;
+    const storageKey = getUserStorageKey(normUserEmail);
+
     let localBookings: ConfirmedBooking[] = [];
     try {
-      const raw = await SecureStore.getItemAsync(BOOKINGS_STORAGE_KEY);
+      const raw = await SecureStore.getItemAsync(storageKey);
       localBookings = raw ? JSON.parse(raw) : [];
+      // Clean up local bookings: only keep items belonging to this user
+      if (normUserEmail) {
+        localBookings = localBookings.filter(
+          (b) => !b.email || b.email.trim().toLowerCase() === normUserEmail
+        );
+      }
     } catch {
       localBookings = [];
     }
 
     try {
       // Attempt to fetch from server if authenticated
-      const serverItems = await apiClient<any[]>('/api/v1/account/bookings', { timeoutMs: 3000 });
-      if (Array.isArray(serverItems) && serverItems.length > 0) {
-        const mappedServer: ConfirmedBooking[] = serverItems.map((item) => {
+      const serverItems = await apiClient<any[]>('/api/v1/account/bookings', { timeoutMs: 3500 });
+      if (Array.isArray(serverItems)) {
+        // Filter strictly by the current user's email if provided
+        const filteredServer = normUserEmail
+          ? serverItems.filter(
+              (item) => !item.guest_email || item.guest_email.trim().toLowerCase() === normUserEmail
+            )
+          : serverItems;
+
+        const mappedServer: ConfirmedBooking[] = filteredServer.map((item) => {
           let slotFormatted = 'Reserved Slot';
           if (item.starts_at) {
             const d = new Date(item.starts_at);
@@ -219,7 +260,7 @@ export const checkoutService = {
             venueAddress: item.venue_address,
             partySize: Number(item.party_size) || 2,
             amountKobo: Number(item.price_kobo) || 0,
-            email: item.guest_email || '',
+            email: item.guest_email || normUserEmail || '',
             slotTime: slotFormatted,
             startsAt: item.starts_at,
             arrivalPin: item.arrival_code || '4829',
@@ -238,11 +279,12 @@ export const checkoutService = {
         }
 
         const merged = Array.from(map.values());
-        await SecureStore.setItemAsync(BOOKINGS_STORAGE_KEY, JSON.stringify(merged));
+        // Save strictly to this user's storage key
+        await SecureStore.setItemAsync(storageKey, JSON.stringify(merged));
         return merged;
       }
     } catch {
-      // Fallback seamlessly to local secure store
+      // Fallback seamlessly to local secure store for this user
     }
 
     return localBookings;

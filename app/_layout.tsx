@@ -6,13 +6,14 @@ import 'react-native-reanimated';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Palette } from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSavedStore } from '../store/useSavedStore';
 
 export {
   ErrorBoundary,
 } from 'expo-router';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  initialRouteName: '(tabs)',
 };
 
 SplashScreen.preventAutoHideAsync();
@@ -35,20 +36,17 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (loaded || error) {
+      SplashScreen.hideAsync().catch(() => {});
     }
-  }, [loaded]);
+  }, [loaded, error]);
 
   useEffect(() => {
-    useAuthStore.getState().initAuth();
+    useAuthStore.getState().initAuth().catch(() => {});
+    useSavedStore.getState().fetchSaved().catch(() => {});
   }, []);
 
-  if (!loaded) {
+  if (!loaded && !error) {
     return null;
   }
 
@@ -109,6 +107,13 @@ export default function RootLayout() {
           name="partner/[slug]"
           options={{
             headerTitle: 'Venue Profile',
+            headerBackTitle: 'Back',
+          }}
+        />
+        <Stack.Screen
+          name="saved"
+          options={{
+            headerTitle: 'Saved & Alerts',
             headerBackTitle: 'Back',
           }}
         />

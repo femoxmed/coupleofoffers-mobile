@@ -74,7 +74,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Hidden from floating tab bar */}
+      {/* Hidden fallback screen for saved */}
       <Tabs.Screen
         name="saved"
         options={{

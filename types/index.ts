@@ -30,6 +30,7 @@ export type Offer = {
   days_available?: string | null;
   time_window?: string | null;
   homepage_featured?: boolean;
+  featured_at?: string | null;
   branches?: OfferBranch[] | null;
   gallery?: string[];
 };
@@ -47,6 +48,7 @@ export type Partner = {
   package_count: number;
   banner_url?: string | null;
   logo_url?: string | null;
+  featured_at?: string | null;
 };
 
 export type Slot = {

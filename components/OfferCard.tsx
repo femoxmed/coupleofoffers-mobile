@@ -16,8 +16,8 @@ interface OfferCardProps {
 
 export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
   const router = useRouter();
-  const { isSaved, toggleSave } = useSavedStore();
-  const saved = isSaved(offer.id);
+  const toggleSave = useSavedStore((state) => state.toggleSave);
+  const saved = useSavedStore((state) => state.savedOffers.some((o) => o.id === offer.id));
 
   const imageSource = resolveImageSource(offer.image_url, Config.FALLBACK_OFFER_IMAGE);
 
@@ -25,7 +25,8 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
     router.push(`/offer/${offer.id}`);
   };
 
-  const handleHeartPress = () => {
+  const handleHeartPress = (e?: any) => {
+    e?.stopPropagation?.();
     toggleSave({
       id: offer.id,
       title: offer.title,

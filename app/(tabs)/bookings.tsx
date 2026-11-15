@@ -46,6 +46,7 @@ import {
   ConfirmedBooking,
   RescheduleSlotItem,
 } from '../../services/checkoutService';
+import { notificationService, ServerNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { QRCode } from '../../components/QRCode';
 
@@ -88,28 +89,47 @@ export default function BookingsScreen() {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [helpBookingRef, setHelpBookingRef] = useState<string | undefined>(undefined);
 
+  const [serverNotifs, setServerNotifs] = useState<{ unreadCount: number; items: ServerNotification[] }>({
+    unreadCount: 0,
+    items: [],
+  });
+
   const loadBookings = useCallback(async () => {
     if (!user) {
       setBookings([]);
       return;
     }
     try {
-      const items = await checkoutService.getBookings();
+      const items = await checkoutService.getBookings(user.email);
       setBookings(items);
     } catch (err) {
       console.warn('Error loading bookings:', err);
     }
   }, [user]);
 
+  const loadNotifications = useCallback(async () => {
+    if (!user) {
+      setServerNotifs({ unreadCount: 0, items: [] });
+      return;
+    }
+    try {
+      const res = await notificationService.getNotifications();
+      setServerNotifs(res);
+    } catch {
+      setServerNotifs({ unreadCount: 0, items: [] });
+    }
+  }, [user]);
+
   useFocusEffect(
     useCallback(() => {
       loadBookings();
-    }, [loadBookings])
+      loadNotifications();
+    }, [loadBookings, loadNotifications])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadBookings();
+    await Promise.all([loadBookings(), loadNotifications()]);
     setRefreshing(false);
   };
 
@@ -212,10 +232,16 @@ export default function BookingsScreen() {
             accessibilityRole="button"
           >
             <Bell size={16} color={Palette.aubergine} />
-            {upcomingBookings.length > 0 && (
+            {((serverNotifs?.unreadCount || 0) > 0 || upcomingBookings.length > 0) && (
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeText}>
-                  {upcomingBookings.length > 9 ? '9+' : upcomingBookings.length}
+                  {serverNotifs.unreadCount > 0
+                    ? serverNotifs.unreadCount > 9
+                      ? '9+'
+                      : serverNotifs.unreadCount
+                    : upcomingBookings.length > 9
+                    ? '9+'
+                    : upcomingBookings.length}
                 </Text>
               </View>
             )}
@@ -721,6 +747,75 @@ export default function BookingsScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 28 }}>
+              {serverNotifs.unreadCount > 0 && (
+                <TouchableOpacity
+                  style={{
+                    alignSelf: 'flex-end',
+                    marginBottom: 10,
+                    paddingVertical: 4,
+                    paddingHorizontal: 8,
+                    borderRadius: 6,
+                    backgroundColor: 'rgba(116, 61, 96, 0.08)',
+                  }}
+                  onPress={async () => {
+                    await notificationService.markAllAsRead();
+                    loadNotifications();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: Palette.mulberry }}>
+                    Mark all as read
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* 1. Real Server In-App Notifications */}
+              {serverNotifs.items?.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.notifCard,
+                    !item.read_at && { borderColor: Palette.mulberry, backgroundColor: '#FFFFFF' },
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={async () => {
+                    if (!item.read_at) {
+                      await notificationService.markAsRead(item.id);
+                      loadNotifications();
+                    }
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                      {!item.read_at && (
+                        <View
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: Palette.mulberry,
+                            marginRight: 6,
+                          }}
+                        />
+                      )}
+                      <Text style={styles.notifOfferTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.notifVenueText}>{item.message}</Text>
+                  <Text style={{ fontSize: 10, color: Palette.mutedText, fontFamily: 'SpaceMono' }}>
+                    {new Date(item.created_at).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              {/* 2. Confirmed Table Passes with Arrival Codes */}
               {upcomingBookings.length > 0 ? (
                 upcomingBookings.map((b) => (
                   <View key={b.reference} style={styles.notifCard}>
@@ -757,7 +852,7 @@ export default function BookingsScreen() {
                     </View>
                   </View>
                 ))
-              ) : (
+              ) : (serverNotifs.items?.length ?? 0) === 0 ? (
                 <View style={styles.notifEmptyWrap}>
                   <Bell size={32} color={Palette.mutedText} style={{ opacity: 0.6, marginBottom: 8 }} />
                   <Text style={styles.notifEmptyTitle}>No Unread Notifications</Text>
@@ -765,7 +860,7 @@ export default function BookingsScreen() {
                     When you book an experience, your guaranteed table confirmation and 4-digit arrival code will appear here.
                   </Text>
                 </View>
-              )}
+              ) : null}
 
               {/* General Reminder Alert */}
               <View style={styles.notifGeneralCard}>

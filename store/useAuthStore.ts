@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { authService, AuthUser } from '../services/authService';
 import { getAuthToken } from '../services/apiClient';
+import { checkoutService } from '../services/checkoutService';
+import { useSavedStore } from './useSavedStore';
 
 interface AuthState {
   user: AuthUser | null;
@@ -18,7 +20,7 @@ interface AuthState {
   logout: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isLoading: false,
@@ -34,6 +36,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       const user = await authService.getMe();
       set({ user, token, isInitialized: true });
+      if (user?.email) {
+        useSavedStore.getState().fetchSaved(user.email);
+      }
     } catch {
       set({ user: null, token: null, isInitialized: true });
     }
@@ -45,6 +50,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await authService.login(email, password);
       const token = await getAuthToken();
       set({ user, token, isLoading: false });
+      if (user?.email) {
+        useSavedStore.getState().fetchSaved(user.email);
+      }
       return user;
     } catch (err) {
       set({ isLoading: false });
@@ -63,6 +71,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await authService.signup(email, password, role, name);
       const token = await getAuthToken();
       set({ user, token, isLoading: false });
+      if (user?.email) {
+        useSavedStore.getState().fetchSaved(user.email);
+      }
       return user;
     } catch (err) {
       set({ isLoading: false });
@@ -73,7 +84,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     set({ isLoading: true });
     try {
+      const currentUser = get().user;
       await authService.logout();
+      if (currentUser?.email) {
+        await checkoutService.clearUserBookings(currentUser.email);
+      }
+      await useSavedStore.getState().clearSaved(currentUser?.email);
       set({ user: null, token: null, isLoading: false });
     } catch {
       set({ user: null, token: null, isLoading: false });
