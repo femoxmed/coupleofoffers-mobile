@@ -583,8 +583,17 @@ export default function BookingsScreen() {
                   <View style={styles.voucherDetailsCard}>
                     <View style={styles.voucherDetailRow}>
                       <Text style={styles.voucherDetailLabel}>Reference Number</Text>
-                      <Text style={styles.voucherDetailValue}>
-                        {selectedVoucher.reference.toUpperCase()}
+                      <Text
+                        style={styles.voucherDetailValue}
+                        numberOfLines={1}
+                        ellipsizeMode="middle"
+                        selectable
+                      >
+                        {selectedVoucher.reference.toUpperCase().startsWith('COO_')
+                          ? selectedVoucher.reference.toUpperCase()
+                          : selectedVoucher.reference.length > 14
+                          ? selectedVoucher.reference.slice(-10).toUpperCase()
+                          : selectedVoucher.reference.toUpperCase()}
                       </Text>
                     </View>
 
@@ -1971,15 +1980,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
   voucherDetailLabel: {
     fontSize: 12,
     color: Palette.mutedText,
+    flexShrink: 0,
   },
   voucherDetailValue: {
     fontSize: 12.5,
     fontWeight: '700',
     color: Palette.aubergine,
+    flex: 1,
+    textAlign: 'right',
   },
   voucherDetailAmount: {
     fontSize: 15,

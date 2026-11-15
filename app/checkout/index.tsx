@@ -260,7 +260,18 @@ export default function MobileBachsCheckoutScreen() {
             <View style={styles.receiptSummary}>
               <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>Reference Number</Text>
-                <Text style={styles.receiptValue}>{reference.toUpperCase()}</Text>
+                <Text
+                  style={styles.receiptValue}
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                  selectable
+                >
+                  {reference.toUpperCase().startsWith('COO_')
+                    ? reference.toUpperCase()
+                    : reference.length > 14
+                    ? reference.slice(-10).toUpperCase()
+                    : reference.toUpperCase()}
+                </Text>
               </View>
 
               <View style={styles.divider} />
@@ -724,16 +735,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
   receiptLabel: {
     fontSize: 12,
     color: Palette.mutedText,
+    flexShrink: 0,
   },
   receiptValue: {
     fontSize: 13,
     fontWeight: '700',
     color: Palette.aubergine,
-    maxWidth: 180,
+    flex: 1,
+    textAlign: 'right',
   },
   receiptAmount: {
     fontSize: 15,
