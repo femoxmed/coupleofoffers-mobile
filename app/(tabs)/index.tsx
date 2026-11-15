@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   RefreshControl,
   FlatList,
   TextInput,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,14 +21,20 @@ import {
   Heart,
   Store,
   Bell,
+  X,
+  CheckCircle2,
+  LogIn,
+  Trash2,
 } from 'lucide-react-native';
 import { Palette } from '../../constants/Colors';
 import { catalogService, DEMO_PARTNERS, WEB_HOMEPAGE_SLIDES } from '../../services/catalog';
 import { checkoutService } from '../../services/checkoutService';
+import { notificationService, ServerNotification } from '../../services/notificationService';
 import { useSavedStore } from '../../store/useSavedStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { Image } from 'expo-image';
 import { resolveImageSource } from '../../constants/images';
-import { Config } from '../../constants/config';
+import { Config, formatNaira } from '../../constants/config';
 import { BrandLogo } from '../../components/BrandLogo';
 import { HeroCarousel } from '../../components/HeroCarousel';
 import { TopCategoryNav } from '../../components/TopCategoryNav';
@@ -38,14 +45,32 @@ import {
   FilterState,
   DEFAULT_FILTERS,
 } from '../../components/ThemedSearchBar';
+import { useLocationStore, UserLocation } from '../../store/useLocationStore';
+import { LocationPickerModal } from '../../components/LocationPickerModal';
 import type { Offer, Partner, HomepageSlide } from '../../types';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { savedOffers } = useSavedStore();
+  const authUser = useAuthStore((s) => s.user);
+  const { savedOffers, toggleSave, fetchSaved } = useSavedStore();
   const savedCount = savedOffers.length;
+  const { currentLocation, initLocation } = useLocationStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
+  const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [savedModalTab, setSavedModalTab] = useState<'offers' | 'alerts'>('offers');
+
+  // Load saved location on startup
+  useEffect(() => {
+    initLocation();
+  }, [initLocation]);
+
+  // Load user-isolated saved offers whenever auth changes
+  useEffect(() => {
+    fetchSaved(authUser?.email);
+  }, [fetchSaved, authUser?.email]);
 
   // 1. Fetch Homepage Hero Slides (exact match with web app)
   const { data: slides, refetch: refetchSlides } = useQuery<HomepageSlide[]>({
@@ -77,28 +102,47 @@ export default function HomeScreen() {
     queryFn: () => catalogService.getOffers(),
   });
 
-  // 4. Fetch Bookings for Notifications Count
+  // 4. Fetch Bookings for Notifications Count (strictly for this authenticated user)
   const { data: bookings, refetch: refetchBookings } = useQuery({
-    queryKey: ['bookings'],
+    queryKey: ['bookings', authUser?.email],
     queryFn: async () => {
+      if (!authUser?.email) return [];
       try {
-        return await checkoutService.getBookings();
+        return await checkoutService.getBookings(authUser.email);
       } catch {
         return [];
       }
     },
+    enabled: Boolean(authUser?.email),
+  });
+
+  // 5. Fetch Server In-App Notifications (strictly for this authenticated user)
+  const { data: serverNotifs, refetch: refetchNotifs } = useQuery({
+    queryKey: ['notifications', authUser?.email],
+    queryFn: async () => {
+      if (!authUser) return { unreadCount: 0, items: [] };
+      return await notificationService.getNotifications();
+    },
+    enabled: Boolean(authUser),
   });
 
   const upcomingCount = useMemo(() => {
-    if (!bookings || !Array.isArray(bookings)) return 0;
+    if (!authUser || !bookings || !Array.isArray(bookings)) return 0;
     return bookings.filter((b) => b.status === 'confirmed').length;
-  }, [bookings]);
+  }, [authUser, bookings]);
+
+  const totalAlertCount = useMemo(() => {
+    if (!authUser) return 0;
+    const serverUnread = serverNotifs?.unreadCount || 0;
+    return serverUnread > 0 ? serverUnread : upcomingCount;
+  }, [authUser, serverNotifs, upcomingCount]);
 
   const onRefreshAll = () => {
     refetchSlides();
     refetchPartners();
     refetchOffers();
     refetchBookings();
+    refetchNotifs();
   };
 
   const handleSearchSubmit = () => {
@@ -144,20 +188,32 @@ export default function HomeScreen() {
 
         {/* Right: User's location pill + Saved wishlist + Notifications Bell */}
         <View style={styles.mastheadRight}>
-          <TouchableOpacity style={styles.locationPill} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.locationPill}
+            onPress={() => setIsLocationModalOpen(true)}
+            activeOpacity={0.8}
+            accessibilityLabel={`Location: ${currentLocation.name}. Tap to change.`}
+            accessibilityRole="button"
+          >
             <MapPin size={11} color={Palette.mulberry} style={{ marginRight: 3 }} />
-            <Text style={styles.locationText}>Victoria Island</Text>
+            <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
+              {currentLocation.name}
+            </Text>
             <ChevronDown size={10} color={Palette.mutedText} style={{ marginLeft: 2 }} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.savedButton}
-            onPress={() => router.push('/(tabs)/saved')}
+            onPress={() => setIsSavedModalOpen(true)}
             activeOpacity={0.8}
             accessibilityLabel="Saved experiences"
             accessibilityRole="button"
           >
-            <Heart size={16} color={Palette.aubergine} />
+            <Heart
+              size={16}
+              color={savedCount > 0 ? '#E0245E' : Palette.aubergine}
+              fill={savedCount > 0 ? '#E0245E' : 'transparent'}
+            />
             {savedCount > 0 && (
               <View style={styles.savedBadge}>
                 <Text style={styles.savedBadgeText}>{savedCount > 9 ? '9+' : savedCount}</Text>
@@ -167,15 +223,15 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.notifButton}
-            onPress={() => router.push('/(tabs)/bookings')}
+            onPress={() => setIsNotifModalOpen(true)}
             activeOpacity={0.8}
             accessibilityLabel="Notifications"
             accessibilityRole="button"
           >
             <Bell size={16} color={Palette.aubergine} />
-            {upcomingCount > 0 && (
+            {totalAlertCount > 0 && (
               <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>{upcomingCount > 9 ? '9+' : upcomingCount}</Text>
+                <Text style={styles.notifBadgeText}>{totalAlertCount > 9 ? '9+' : totalAlertCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -366,6 +422,432 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* ========================================================= */}
+      {/* NOTIFICATIONS & TABLE ALERTS MODAL                       */}
+      {/* ========================================================= */}
+      <Modal
+        visible={isNotifModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsNotifModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxHeight: '85%' }]}>
+            <View style={styles.modalHandleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
+
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.notifModalIconWrap}>
+                  <Bell size={18} color={Palette.aubergine} />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>Notifications & Alerts</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Table passes, arrival codes & date reminders
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setIsNotifModalOpen(false)}
+                activeOpacity={0.7}
+              >
+                <X size={16} color={Palette.mutedText} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 28 }}>
+              {!authUser ? (
+                <View style={styles.notifEmptyWrap}>
+                  <View style={styles.notifEmptyCircle}>
+                    <Bell size={28} color={Palette.mutedText} />
+                  </View>
+                  <Text style={styles.notifEmptyTitle}>Stay updated on your reservations</Text>
+                  <Text style={styles.notifEmptyText}>
+                    Sign in to view your 4-digit arrival PINs, table vouchers, and concierge alerts.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.notifSignInBtn}
+                    onPress={() => {
+                      setIsNotifModalOpen(false);
+                      router.push('/login');
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <LogIn size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.notifSignInBtnText}>Sign In to Account</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (serverNotifs?.items && serverNotifs.items.length > 0) || (upcomingCount > 0 && bookings) ? (
+                <>
+                  {serverNotifs && serverNotifs.unreadCount > 0 && (
+                    <TouchableOpacity
+                      style={styles.markAllReadBtn}
+                      onPress={async () => {
+                        await notificationService.markAllAsRead();
+                        refetchNotifs();
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.markAllReadText}>Mark all as read</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* 1. Real Server In-App Notifications */}
+                  {serverNotifs?.items?.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.serverNotifCard,
+                        !item.read_at && { borderColor: Palette.mulberry, backgroundColor: '#FFFFFF' },
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={async () => {
+                        if (!item.read_at) {
+                          await notificationService.markAsRead(item.id);
+                          refetchNotifs();
+                        }
+                        if (item.booking_reference) {
+                          setIsNotifModalOpen(false);
+                          router.navigate('/(tabs)/bookings');
+                        }
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          {!item.read_at && <View style={styles.serverNotifUnreadDot} />}
+                          <Text style={styles.serverNotifTitle} numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                        </View>
+                        {item.booking_reference && (
+                          <Text style={{ fontSize: 10, color: Palette.mutedText, fontFamily: 'SpaceMono' }}>
+                            Pass →
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={styles.serverNotifMessage}>{item.message}</Text>
+                      <Text style={styles.serverNotifDate}>
+                        {new Date(item.created_at).toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* 2. Confirmed Table Passes with Arrival Codes */}
+                  {bookings &&
+                    bookings
+                      .filter((b) => b.status === 'confirmed')
+                      .map((b) => (
+                        <View key={b.reference} style={styles.notifCard}>
+                          <View style={styles.notifCardTop}>
+                            <View style={styles.notifBadgeWrap}>
+                              <CheckCircle2 size={13} color="#FFFFFF" />
+                              <Text style={styles.notifBadgeLabel}>Table Confirmed</Text>
+                            </View>
+                            <Text style={styles.notifRefText}>
+                              Ref: {b.reference.slice(-10).toUpperCase()}
+                            </Text>
+                          </View>
+
+                          <Text style={styles.notifOfferTitle}>{b.offerTitle}</Text>
+                          <Text style={styles.notifVenueText}>
+                            {b.venueName} • Table for {b.partySize}
+                          </Text>
+
+                          <View style={styles.notifPinBanner}>
+                            <View>
+                              <Text style={styles.notifPinBannerLabel}>Your Arrival Code</Text>
+                              <Text style={styles.notifPinBannerCode}>{b.arrivalPin}</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={styles.notifViewPassBtn}
+                              onPress={() => {
+                                setIsNotifModalOpen(false);
+                                router.navigate('/(tabs)/bookings');
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.notifViewPassBtnText}>View Pass →</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                </>
+              ) : (
+                <View style={styles.notifEmptyWrap}>
+                  <View style={[styles.notifEmptyCircle, { backgroundColor: 'rgba(46, 125, 50, 0.1)' }]}>
+                    <CheckCircle2 size={28} color="#2E7D32" />
+                  </View>
+                  <Text style={styles.notifEmptyTitle}>You are all caught up!</Text>
+                  <Text style={styles.notifEmptyText}>
+                    When you reserve an experience, your confirmed date arrival codes and venue updates will appear here.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* SAVED & WISHLIST MODAL (LOVE BUTTON IN HEADER)            */}
+      {/* ========================================================= */}
+      <Modal
+        visible={isSavedModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsSavedModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxHeight: '88%' }]}>
+            <View style={styles.modalHandleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
+
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.savedModalIconWrap}>
+                  <Heart size={18} color="#E0245E" fill="#E0245E" />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>Saved Experiences</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {savedOffers.length} {savedOffers.length === 1 ? 'saved package' : 'saved packages'}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setIsSavedModalOpen(false)}
+                activeOpacity={0.7}
+              >
+                <X size={16} color={Palette.mutedText} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Sub-tabs: Saved Experiences vs Saved Alerts */}
+            <View style={styles.savedTabsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.savedTabBtn,
+                  savedModalTab === 'offers' && styles.savedTabBtnActive,
+                ]}
+                onPress={() => setSavedModalTab('offers')}
+                activeOpacity={0.8}
+              >
+                <Heart
+                  size={13}
+                  color={savedModalTab === 'offers' ? '#E0245E' : Palette.mutedText}
+                  fill={savedModalTab === 'offers' ? '#E0245E' : 'transparent'}
+                />
+                <Text
+                  style={[
+                    styles.savedTabBtnText,
+                    savedModalTab === 'offers' && styles.savedTabBtnTextActive,
+                  ]}
+                >
+                  Saved Packages ({savedOffers.length})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.savedTabBtn,
+                  savedModalTab === 'alerts' && styles.savedTabBtnActive,
+                ]}
+                onPress={() => setSavedModalTab('alerts')}
+                activeOpacity={0.8}
+              >
+                <Bell
+                  size={13}
+                  color={savedModalTab === 'alerts' ? Palette.aubergine : Palette.mutedText}
+                />
+                <Text
+                  style={[
+                    styles.savedTabBtnText,
+                    savedModalTab === 'alerts' && styles.savedTabBtnTextActive,
+                  ]}
+                >
+                  Saved Alerts ({upcomingCount})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+              {savedModalTab === 'offers' ? (
+                savedOffers.length > 0 ? (
+                  savedOffers.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.savedItemCard}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setIsSavedModalOpen(false);
+                        router.push(`/offer/${item.id}`);
+                      }}
+                    >
+                      <Image
+                        source={resolveImageSource(item.image_url, Config.FALLBACK_OFFER_IMAGE)}
+                        style={styles.savedItemThumb}
+                        contentFit="cover"
+                        transition={200}
+                      />
+                      <View style={styles.savedItemContent}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={styles.savedItemVenue} numberOfLines={1}>
+                            {item.venue_name || 'Partner Venue'}
+                          </Text>
+                          <TouchableOpacity
+                            hitSlop={10}
+                            onPress={(e) => {
+                              e?.stopPropagation?.();
+                              toggleSave(item);
+                            }}
+                            style={{ padding: 2 }}
+                          >
+                            <Trash2 size={14} color={Palette.mutedText} />
+                          </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.savedItemTitle} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+
+                        <View style={styles.savedItemBottom}>
+                          <Text style={styles.savedItemPrice}>
+                            {formatNaira(item.price_kobo)}
+                            <Text style={styles.savedItemParty}> · For {item.party_size || 2}</Text>
+                          </Text>
+
+                          <View style={styles.savedBookPill}>
+                            <Text style={styles.savedBookPillText}>Book Now →</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.notifEmptyWrap}>
+                    <View style={[styles.notifEmptyCircle, { backgroundColor: 'rgba(224, 36, 94, 0.08)' }]}>
+                      <Heart size={28} color="#E0245E" />
+                    </View>
+                    <Text style={styles.notifEmptyTitle}>Your wishlist is empty</Text>
+                    <Text style={styles.notifEmptyText}>
+                      Tap the heart button on any date package to save it here for quick access.
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.notifSignInBtn, { backgroundColor: Palette.aubergine }]}
+                      onPress={() => {
+                        setIsSavedModalOpen(false);
+                        router.navigate('/(tabs)/explore');
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.notifSignInBtnText}>Explore Experiences</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              ) : (
+                /* Saved Alerts Tab */
+                !authUser ? (
+                  <View style={styles.notifEmptyWrap}>
+                    <View style={styles.notifEmptyCircle}>
+                      <Bell size={28} color={Palette.mutedText} />
+                    </View>
+                    <Text style={styles.notifEmptyTitle}>Stay updated on your reservations</Text>
+                    <Text style={styles.notifEmptyText}>
+                      Sign in to view your 4-digit arrival PINs, table vouchers, and concierge alerts.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.notifSignInBtn}
+                      onPress={() => {
+                        setIsSavedModalOpen(false);
+                        router.push('/login');
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <LogIn size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.notifSignInBtnText}>Sign In to Account</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : upcomingCount > 0 && bookings ? (
+                  bookings
+                    .filter((b) => b.status === 'confirmed')
+                    .map((b) => (
+                      <View key={b.reference} style={styles.notifCard}>
+                        <View style={styles.notifCardTop}>
+                          <View style={styles.notifBadgeWrap}>
+                            <CheckCircle2 size={13} color="#FFFFFF" />
+                            <Text style={styles.notifBadgeLabel}>Table Confirmed</Text>
+                          </View>
+                          <Text style={styles.notifRefText}>
+                            Ref: {b.reference.slice(-10).toUpperCase()}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.notifOfferTitle}>{b.offerTitle}</Text>
+                        <Text style={styles.notifVenueText}>
+                          {b.venueName} • Table for {b.partySize}
+                        </Text>
+
+                        <View style={styles.notifPinBanner}>
+                          <View>
+                            <Text style={styles.notifPinBannerLabel}>Your Arrival Code</Text>
+                            <Text style={styles.notifPinBannerCode}>{b.arrivalPin}</Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.notifViewPassBtn}
+                            onPress={() => {
+                              setIsSavedModalOpen(false);
+                              router.navigate('/(tabs)/bookings');
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.notifViewPassBtnText}>View Pass →</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))
+                ) : (
+                  <View style={styles.notifEmptyWrap}>
+                    <View style={[styles.notifEmptyCircle, { backgroundColor: 'rgba(46, 125, 50, 0.1)' }]}>
+                      <CheckCircle2 size={28} color="#2E7D32" />
+                    </View>
+                    <Text style={styles.notifEmptyTitle}>All caught up!</Text>
+                    <Text style={styles.notifEmptyText}>
+                      When you reserve a table, your confirmed arrival codes and alerts will appear here.
+                    </Text>
+                  </View>
+                )
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* 4. LOCATION PICKER & GEOCODING MODAL                      */}
+      {/* ========================================================= */}
+      <LocationPickerModal
+        visible={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onLocationSelected={(loc) => {
+          if (loc.name) {
+            setFilters((prev) => ({ ...prev, area: loc.name }));
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -400,11 +882,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Palette.border,
+    maxWidth: 140,
   },
   locationText: {
     fontSize: 11,
     fontWeight: '700',
     color: Palette.aubergine,
+    maxWidth: 95,
   },
   savedButton: {
     position: 'relative',
@@ -681,5 +1165,340 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: Palette.aubergine,
+  },
+  // Modal & Notifications styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  modalHandleWrap: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E0D0D8',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Palette.aubergine,
+  },
+  modalSubtitle: {
+    fontSize: 11,
+    color: Palette.mutedText,
+    marginTop: 1,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Palette.secondaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifModalIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(235, 179, 66, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifCard: {
+    backgroundColor: Palette.card,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(116, 61, 96, 0.15)',
+    marginBottom: 12,
+  },
+  notifCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  notifBadgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E7D32',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+  },
+  notifBadgeLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+  },
+  notifRefText: {
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'SpaceMono',
+    color: Palette.mutedText,
+  },
+  notifOfferTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    marginBottom: 2,
+  },
+  notifVenueText: {
+    fontSize: 12,
+    color: Palette.mutedText,
+    marginBottom: 12,
+  },
+  notifPinBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Palette.secondaryBg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(116, 61, 96, 0.12)',
+  },
+  notifPinBannerLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: Palette.mutedText,
+    textTransform: 'uppercase',
+  },
+  notifPinBannerCode: {
+    fontSize: 18,
+    fontWeight: '900',
+    fontFamily: 'SpaceMono',
+    color: Palette.mulberry,
+    letterSpacing: 2,
+    marginTop: 2,
+  },
+  notifViewPassBtn: {
+    backgroundColor: Palette.aubergine,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  notifViewPassBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  notifEmptyWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+  },
+  notifEmptyCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: Palette.secondaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  notifEmptyTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  notifEmptyText: {
+    fontSize: 12,
+    color: Palette.mutedText,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 260,
+  },
+  notifSignInBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Palette.aubergine,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  notifSignInBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  savedModalIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(224, 36, 94, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  savedTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  savedTabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: Palette.secondaryBg,
+    borderWidth: 1,
+    borderColor: 'rgba(116, 61, 96, 0.1)',
+  },
+  savedTabBtnActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: Palette.mulberry,
+    shadowColor: Palette.aubergine,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  savedTabBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.mutedText,
+  },
+  savedTabBtnTextActive: {
+    color: Palette.aubergine,
+    fontWeight: '800',
+  },
+  savedItemCard: {
+    flexDirection: 'row',
+    backgroundColor: Palette.card,
+    borderRadius: 14,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(116, 61, 96, 0.12)',
+    marginBottom: 10,
+    gap: 12,
+    alignItems: 'center',
+  },
+  savedItemThumb: {
+    width: 76,
+    height: 76,
+    borderRadius: 10,
+    backgroundColor: Palette.muted,
+  },
+  savedItemContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  savedItemVenue: {
+    fontSize: 11,
+    color: Palette.mutedText,
+    fontWeight: '600',
+    maxWidth: '85%',
+  },
+  savedItemTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  savedItemBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  savedItemPrice: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Palette.mulberry,
+  },
+  savedItemParty: {
+    fontSize: 10,
+    fontWeight: '400',
+    color: Palette.mutedText,
+  },
+  savedBookPill: {
+    backgroundColor: Palette.aubergine,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  savedBookPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  serverNotifCard: {
+    backgroundColor: Palette.card,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(116, 61, 96, 0.12)',
+    marginBottom: 10,
+  },
+  serverNotifUnreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Palette.mulberry,
+    marginRight: 6,
+  },
+  serverNotifTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    flex: 1,
+  },
+  serverNotifMessage: {
+    fontSize: 12,
+    color: Palette.mutedText,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  serverNotifDate: {
+    fontSize: 10,
+    color: Palette.mutedText,
+    fontWeight: '500',
+    marginTop: 6,
+  },
+  markAllReadBtn: {
+    alignSelf: 'flex-end',
+    marginBottom: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(116, 61, 96, 0.08)',
+  },
+  markAllReadText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.mulberry,
   },
 });

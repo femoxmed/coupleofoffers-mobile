@@ -37,7 +37,13 @@
         }
       ],
       "expo-image",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Couple Of Offers to use your location to show curated experiences and venues near you."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
