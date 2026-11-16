@@ -1,11 +1,11 @@
+import { CatalogImage } from './CatalogImage';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Heart, Users, MapPin } from 'lucide-react-native';
 import { Palette } from '../constants/Colors';
-import { formatNaira, Config } from '../constants/config';
-import { resolveImageSource, LOCAL_ASSETS } from '../constants/images';
+import { formatNaira } from '../constants/config';
+
 import { useSavedStore } from '../store/useSavedStore';
 import type { Offer } from '../types';
 
@@ -19,7 +19,6 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
   const toggleSave = useSavedStore((state) => state.toggleSave);
   const saved = useSavedStore((state) => state.savedOffers.some((o) => o.id === offer.id));
 
-  const imageSource = resolveImageSource(offer.image_url, Config.FALLBACK_OFFER_IMAGE);
 
   const handleCardPress = () => {
     router.push(`/offer/${offer.id}`);
@@ -56,7 +55,7 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
     (offer.max_party_size || 0) > offer.party_size ||
     (offer.extra_friend_price_kobo || 0) > 0;
 
-  const partyBadgeLabel = `${allowsExtraGuests ? 'From' : 'For'} ${offer.party_size} ${offer.party_size === 1 ? 'person' : 'persons'}`;
+  const partyBadgeLabel = `${allowsExtraGuests ? 'From' : 'For'} ${offer.party_size} ${offer.party_size === 1 ? 'guest' : 'guests'}`;
 
   // Compact Modern Card Layout (horizontal, sleek, luxury)
   if (layout === 'compact') {
@@ -68,13 +67,7 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
       >
         {/* Left: 110x110 Image */}
         <View style={styles.compactImageWrapper}>
-          <Image
-            source={imageSource}
-            placeholder={LOCAL_ASSETS['dining-room.jpg']}
-            style={styles.compactImage}
-            contentFit="cover"
-            transition={300}
-          />
+          <CatalogImage url={offer.image_url} category={offer.category} style={styles.compactImage} />
           <Pressable
             hitSlop={8}
             onPress={handleHeartPress}
@@ -82,8 +75,8 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
           >
             <Heart
               size={14}
-              color={saved ? '#E0245E' : Palette.aubergine}
-              fill={saved ? '#E0245E' : 'transparent'}
+              color={saved ? Palette.saved : Palette.aubergine}
+              fill={saved ? Palette.saved : 'transparent'}
             />
           </Pressable>
 
@@ -140,13 +133,7 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
       style={styles.featuredCard}
     >
       <View style={styles.featuredImageContainer}>
-        <Image
-          source={imageSource}
-          placeholder={LOCAL_ASSETS['terrace-evening.jpg']}
-          style={styles.featuredImage}
-          contentFit="cover"
-          transition={300}
-        />
+        <CatalogImage url={offer.image_url} category={offer.category} style={styles.featuredImage} />
         <View style={styles.badgeRow}>
           <View style={styles.leftBadges}>
             {offer.homepage_featured && (
@@ -169,8 +156,8 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
           >
             <Heart
               size={16}
-              color={saved ? '#E0245E' : Palette.aubergine}
-              fill={saved ? '#E0245E' : 'transparent'}
+              color={saved ? Palette.saved : Palette.aubergine}
+              fill={saved ? Palette.saved : 'transparent'}
             />
           </Pressable>
         </View>

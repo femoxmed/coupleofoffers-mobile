@@ -1,11 +1,12 @@
+import { CatalogImage } from './CatalogImage';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Image } from 'expo-image';
+
 import { useRouter } from 'expo-router';
 import { MapPin, Utensils, ArrowRight } from 'lucide-react-native';
 import { Palette } from '../constants/Colors';
-import { formatNaira, Config } from '../constants/config';
-import { resolveImageSource, LOCAL_ASSETS } from '../constants/images';
+import { formatNaira} from '../constants/config';
+
 import type { Partner } from '../types';
 
 interface PartnerCardProps {
@@ -20,7 +21,6 @@ export function PartnerCard({ partner, width }: PartnerCardProps) {
     router.push(`/partner/${partner.slug || partner.id}`);
   };
 
-  const bannerSource = resolveImageSource(partner.banner_url, Config.FALLBACK_VENUE_IMAGE);
 
   // Keep the area label compact.
   const rawArea = partner.area || partner.address || 'City Center';
@@ -43,13 +43,7 @@ export function PartnerCard({ partner, width }: PartnerCardProps) {
     >
       {/* 1. Venue Photo Banner (reduced height to eliminate bulk) */}
       <View style={[styles.imageContainer, { height: isFullWidth ? 116 : 108 }]}>
-        <Image
-          source={bannerSource}
-          placeholder={LOCAL_ASSETS['partner-banner.jpg']}
-          style={styles.image}
-          contentFit="cover"
-          transition={250}
-        />
+        <CatalogImage url={partner.banner_url} category={partner.primary_category || "venues"} style={styles.image} />
 
         {/* Floating top badges */}
         <View style={styles.topBadgesRow}>

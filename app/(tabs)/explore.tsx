@@ -1,12 +1,11 @@
+import { BrandRefreshFlatList } from '../../components/BrandRefreshScrollView';
+import { BrandLoader } from '../../components/BrandLoader';
 import { DataState } from '../../components/DataState';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  RefreshControl,
-  ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -131,21 +130,16 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <BrandRefreshFlatList
         data={filteredOffers}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <OfferCard offer={item} layout="compact" />}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => {
+        refreshing={isRefetching}
+        onRefresh={() => {
               refetch();
             }}
-            tintColor={Palette.mulberry}
-          />
-        }
         ListHeaderComponent={
           <View style={styles.headerBlock}>
             {/* Reusable Themed Search Bar with Filter in the Search Box */}
@@ -180,7 +174,7 @@ export default function ExploreScreen() {
         ListEmptyComponent={
           isError ? <DataState message="Unable to load data. Check your connection and try again." onRetry={() => { void refetch(); }} /> : isLoading ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={Palette.mulberry} />
+              <BrandLoader size="large" color={Palette.mulberry} />
             </View>
           ) : (
             <View style={styles.emptyContainer}>

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader';
 import React, { useState } from 'react';
 import {
   View,
@@ -8,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -165,7 +165,7 @@ export default function LoginScreen() {
             activeOpacity={0.88}
           >
             {isLoading ? (
-              <ActivityIndicator color={Palette.porcelain} />
+              <BrandLoader color={Palette.porcelain} />
             ) : (
               <>
                 <Text style={styles.primaryButtonText}>Sign In</Text>

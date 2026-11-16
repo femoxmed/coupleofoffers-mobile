@@ -101,3 +101,23 @@ test('public requests and guest checkout continue when secure storage is unavail
   await service.apiClient('/api/v1/offers/offer/checkout',{method:'POST'});
   assert.equal(calls[2].Cookie,'coo_guest=real-guest');
 });
+
+test('native signout clears account and guest sessions and requests omit automatic cookies',async()=>{
+ const stored=new Map([['coo_auth_token','account-a-token'],['coo_auth_user','{"email":"a@example.test"}'],['coo_guest_cookie','coo_guest=old-guest']]);
+ const calls=[];
+ const storage={getItemAsync:async key=>stored.get(key)||null,setItemAsync:async(key,value)=>stored.set(key,value),deleteItemAsync:async key=>stored.delete(key)};
+ const service=loadService('apiClient.ts',null,storage,{fetch:async(url,options)=>{calls.push(options);return Response.json([]);}});
+ assert.equal(await service.getAuthToken(),'account-a-token');
+ await service.removeAuthToken();assert.equal(await service.getAuthToken(),null);
+ await service.apiClient('/api/v1/offers');
+ assert.equal(calls[0].credentials,'omit');assert.equal(calls[0].headers.Authorization,undefined);assert.equal(calls[0].headers.Cookie,undefined);
+ assert.equal(stored.size,0);
+});
+
+test('missing catalogue covers stay empty instead of becoming stock photos',async()=>{
+ const {catalogService}=loadService('catalog.ts',async endpoint=>endpoint==='/api/v1/offers'?[{id:'offer',image_url:null}]:endpoint==='/api/v1/partners'?[{id:'venue',banner_url:null}]:{id:'venue',banner_url:null,packages:[{id:'offer',image_url:null}],gallery:[]});
+ assert.equal((await catalogService.getOffers())[0].image_url,null);
+ assert.equal((await catalogService.getPartners())[0].banner_url,null);
+ const detail=await catalogService.getPartnerBySlug('venue');
+ assert.equal(detail.banner_url,null);assert.equal(detail.packages[0].image_url,null);assert.equal(detail.gallery.length,0);
+});

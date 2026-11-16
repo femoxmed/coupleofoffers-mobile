@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@hookform/resolvers": "^7.0.6",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@tanstack/react-query": "^5.107.1",
     "date-fns": "^4.4.0",
     "expo": "~58.0.25",
@@ -35,14 +36,18 @@
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
-    "test:services": "node --test test/services.test.cjs",
+    "test:services": "node --test test/*.test.cjs",
     "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web"
+    "ios": "expo prebuild --platform ios --no-install && expo run:ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "prebuild:ios": "expo prebuild --platform ios --no-install"
   },
   "private": true
 }

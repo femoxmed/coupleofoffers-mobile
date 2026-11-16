@@ -1,3 +1,4 @@
+import { BrandLoader } from '../../components/BrandLoader';
 import React, { useState } from 'react';
 import {
   View,
@@ -6,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -209,7 +209,7 @@ export default function ProfileScreen() {
               activeOpacity={0.88}
             >
               {isLoading ? (
-                <ActivityIndicator color={Palette.porcelain} />
+                <BrandLoader color={Palette.porcelain} />
               ) : (
                 <View style={styles.submitBtnRow}>
                   <Text style={styles.signInSubmitText}>Sign In</Text>

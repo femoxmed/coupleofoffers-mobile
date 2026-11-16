@@ -2,6 +2,7 @@ export const Palette = {
   aubergine: '#301D32',
   porcelain: '#FAF5ED',
   mulberry: '#743D60',
+  saved: '#743D60',
   champagne: '#E5C99A',
   goldInk: '#806020',
   secondaryBg: '#EFE3E7',

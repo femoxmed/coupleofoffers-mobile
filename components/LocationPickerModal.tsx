@@ -1,3 +1,4 @@
+import { BrandLoader } from './BrandLoader';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -7,7 +8,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  ActivityIndicator,
   Pressable,
   KeyboardAvoidingView,
   Platform,
@@ -192,7 +192,7 @@ export function LocationPickerModal({
             >
               <View style={styles.detectIconWrap}>
                 {isDetecting ? (
-                  <ActivityIndicator size="small" color={Palette.mulberry} />
+                  <BrandLoader size="small" color={Palette.mulberry} />
                 ) : (
                   <Navigation size={18} color={Palette.mulberry} />
                 )}
@@ -227,7 +227,7 @@ export function LocationPickerModal({
                   autoCorrect={false}
                 />
                 {isLoadingSuggestions && (
-                  <ActivityIndicator size="small" color={Palette.mulberry} style={{ marginRight: 6 }} />
+                  <BrandLoader size="small" color={Palette.mulberry} style={{ marginRight: 6 }} />
                 )}
                 {searchQuery.length > 0 && !isLoadingSuggestions && (
                   <TouchableOpacity

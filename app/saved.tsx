@@ -1,3 +1,4 @@
+import { CatalogImage } from '../components/CatalogImage';
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
@@ -5,11 +6,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
+
 import {
   Heart,
   Bell,
@@ -19,12 +19,12 @@ import {
   Compass,
 } from 'lucide-react-native';
 import { Palette } from '../constants/Colors';
-import { Config, formatNaira } from '../constants/config';
-import { resolveImageSource } from '../constants/images';
+import { formatNaira } from '../constants/config';
+
 import { useSavedStore } from '../store/useSavedStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { checkoutService } from '../services/checkoutService';
-import { notificationService, ServerNotification } from '../services/notificationService';
+import { notificationService} from '../services/notificationService';
 import type { Offer } from '../types';
 
 export default function SavedScreen() {
@@ -83,8 +83,8 @@ export default function SavedScreen() {
         >
           <Heart
             size={14}
-            color={activeTab === 'offers' ? '#E0245E' : Palette.mutedText}
-            fill={activeTab === 'offers' ? '#E0245E' : 'transparent'}
+            color={activeTab === 'offers' ? Palette.saved : Palette.mutedText}
+            fill={activeTab === 'offers' ? Palette.saved : 'transparent'}
           />
           <Text
             style={[
@@ -130,12 +130,7 @@ export default function SavedScreen() {
                 activeOpacity={0.85}
                 onPress={() => router.push(`/offer/${item.id}`)}
               >
-                <Image
-                  source={resolveImageSource(item.image_url, Config.FALLBACK_OFFER_IMAGE)}
-                  style={styles.cardThumb}
-                  contentFit="cover"
-                  transition={200}
-                />
+                <CatalogImage url={item.image_url} style={styles.cardThumb} />
                 <View style={styles.cardContent}>
                   <View style={styles.cardHeader}>
                     <Text style={styles.cardVenue} numberOfLines={1}>
@@ -173,7 +168,7 @@ export default function SavedScreen() {
           ) : (
             <View style={styles.emptyWrap}>
               <View style={[styles.emptyIconCircle, { backgroundColor: 'rgba(224, 36, 94, 0.08)' }]}>
-                <Heart size={32} color="#E0245E" />
+                <Heart size={32} color={Palette.saved} />
               </View>
               <Text style={styles.emptyTitle}>Your wishlist is empty</Text>
               <Text style={styles.emptySubtitle}>

@@ -75,3 +75,13 @@ npm run start
 - Press **`i`** to open in the iOS Simulator.
 - Press **`a`** to open in the Android Emulator.
 - Scan the QR code using **Expo Go** on a physical phone.
+
+## Native icon updates
+
+The app icon is configured explicitly for iOS and Android in `app.json`. The iOS generated asset catalogue previously contained an older image even after the Expo source asset changed. Regenerate it before building directly from Xcode with `npm run prebuild:ios`. The `npm run ios` command now performs that step automatically. To build and install on a connected iPhone, use `npm run ios -- --device` (Node 22.13+).
+
+A JavaScript reload or update cannot replace the installed home-screen icon: rebuild and install the native application. If the launcher still shows a cached icon after installing the new build, remove the old installation and reinstall.
+
+Loading states use `BrandLoader`: only the two interlocking O rings animate. Saved hearts use brand mulberry (`Palette.saved` / `#743D60`), and the home header count uses mulberry with champagne text.
+
+Missing catalogue covers use the same category artwork as web; venue galleries contain only supplied photos. Pull-to-refresh on Home, Explore, Partners and Bookings hides the native spinner and displays the two-O `BrandLoader` while pulling and refreshing.

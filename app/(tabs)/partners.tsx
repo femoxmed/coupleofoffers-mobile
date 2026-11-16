@@ -1,12 +1,11 @@
+import { BrandRefreshFlatList } from '../../components/BrandRefreshScrollView';
+import { BrandLoader } from '../../components/BrandLoader';
 import { DataState } from '../../components/DataState';
 import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  RefreshControl,
-  ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -75,21 +74,16 @@ export default function PartnersScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <BrandRefreshFlatList
         data={filteredPartners}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <PartnerCard partner={item} />}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => {
+        refreshing={isRefetching}
+        onRefresh={() => {
               refetch();
             }}
-            tintColor={Palette.mulberry}
-          />
-        }
         ListHeaderComponent={
           <View style={styles.headerBlock}>
             <View style={styles.titleSection}>
@@ -130,7 +124,7 @@ export default function PartnersScreen() {
         ListEmptyComponent={
           isError ? <DataState message="Unable to load data. Check your connection and try again." onRetry={() => { void refetch(); }} /> : isLoading ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={Palette.mulberry} />
+              <BrandLoader size="large" color={Palette.mulberry} />
             </View>
           ) : (
             <View style={styles.emptyContainer}>

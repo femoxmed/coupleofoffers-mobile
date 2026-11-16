@@ -1,3 +1,6 @@
+import { CatalogImage } from '../../components/CatalogImage';
+import { BrandLoader } from '../../components/BrandLoader';
+import { priceForParty } from '../../utils/pricing';
 import { DataState } from '../../components/DataState';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
@@ -6,7 +9,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   Share,
   Linking,
@@ -19,7 +21,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
+
 import * as WebBrowser from 'expo-web-browser';
 import {
   MapPin,
@@ -45,8 +47,8 @@ import {
   Store,
 } from 'lucide-react-native';
 import { Palette } from '../../constants/Colors';
-import { formatNaira, Config } from '../../constants/config';
-import { resolveImageSource, LOCAL_ASSETS } from '../../constants/images';
+import { formatNaira} from '../../constants/config';
+
 import { catalogService } from '../../services/catalog';
 import { checkoutService } from '../../services/checkoutService';
 import { useSavedStore } from '../../store/useSavedStore';
@@ -70,7 +72,7 @@ export default function OfferDetailScreen() {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-  const [partySize, setPartySize] = useState<number>(2);
+  const [partyChoice, setPartyChoice] = useState<{ offerId: string; size: number } | null>(null);
   const [email, setEmail] = useState<string>(authUser?.email || '');
   const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -99,6 +101,12 @@ export default function OfferDetailScreen() {
 
   const basePartySize = offer?.party_size || 2;
   const maxPartySize = offer?.max_party_size ?? basePartySize;
+  const partySize = partyChoice?.offerId === offer?.id
+    ? Math.max(basePartySize, Math.min(maxPartySize, partyChoice?.size ?? basePartySize))
+    : basePartySize;
+  const setPartySize = (update: (current: number) => number) => {
+    if (offer) setPartyChoice({ offerId: offer.id, size: update(partySize) });
+  };
   const extraGuestPrice = offer?.extra_friend_price_kobo ?? 0;
   const allowsMoreThanTwo =
     maxPartySize > basePartySize || (offer?.extra_friend_price_kobo || 0) > 0;
@@ -145,15 +153,12 @@ export default function OfferDetailScreen() {
     return sortedDates.find((d) => d >= todayStr) || sortedDates[0] || todayStr;
   }, [slotsByDate, todayStr]);
 
-  // Initialize party size, branch, date and slot
+  // Initialize branch selection from the selected catalogue entry.
   useEffect(() => {
-    if (offer?.party_size && (partySize < offer.party_size || partySize > maxPartySize)) {
-      setPartySize(offer.party_size);
-    }
     if (branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(offer?.venue_id || branches[0].id);
     }
-  }, [offer, branches, selectedBranchId, partySize, maxPartySize]);
+  }, [offer, branches, selectedBranchId]);
 
   useEffect(() => {
     if (!selectedDate && firstAvailableDate) {
@@ -246,7 +251,7 @@ export default function OfferDetailScreen() {
 
   // Gallery images array
   const galleryPhotos = useMemo(() => {
-    if (!offer) return ['terrace-evening.jpg'];
+    if (!offer) return [null];
     const list: string[] = [];
     if (offer.gallery && offer.gallery.length > 0) {
       offer.gallery.forEach((url) => {
@@ -255,7 +260,7 @@ export default function OfferDetailScreen() {
     } else if (offer.image_url) {
       list.push(offer.image_url);
     }
-    return list.length > 0 ? list : ['terrace-evening.jpg'];
+    return list.length > 0 ? list : [null];
   }, [offer]);
 
   const galleryScrollRef = useRef<any>(null);
@@ -287,17 +292,11 @@ export default function OfferDetailScreen() {
       .trim();
   }, [offer]);
 
-  // Dynamic calculated totals and savings
-  const extraGuests = Math.max(0, partySize - basePartySize);
-  const calculatedTotalKobo = (offer?.price_kobo || 0) + extraGuests * extraGuestPrice;
-
-  const regularBase = offer?.regular_price_kobo || offer?.price_kobo || calculatedTotalKobo;
-  const regularExtraPrice = offer?.regular_extra_guest_kobo || extraGuestPrice;
-  const regularTotalKobo = regularBase + extraGuests * regularExtraPrice;
-
-  const totalSavingsKobo = Math.max(0, regularTotalKobo - calculatedTotalKobo);
-  const discountPercent =
-    regularTotalKobo > 0 ? Math.round((totalSavingsKobo / regularTotalKobo) * 100) : 0;
+  const quote = offer ? priceForParty(offer, partySize) : null;
+  const calculatedTotalKobo = quote?.totalKobo ?? 0;
+  const regularTotalKobo = quote?.regularTotalKobo ?? 0;
+  const totalSavingsKobo = quote?.savingsKobo ?? 0;
+  const discountPercent = quote?.discountPercent ?? 0;
 
   const handleShare = async () => {
     if (!offer) return;
@@ -423,7 +422,7 @@ export default function OfferDetailScreen() {
   if (isLoading || !offer) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Palette.mulberry} />
+        <BrandLoader size="large" color={Palette.mulberry} />
         <Text style={styles.loadingText}>Loading experience details...</Text>
       </View>
     );
@@ -454,14 +453,7 @@ export default function OfferDetailScreen() {
             scrollEventThrottle={16}
           >
             {galleryPhotos.map((photoUri, idx) => (
-              <Image
-                key={idx}
-                source={resolveImageSource(photoUri, Config.FALLBACK_OFFER_IMAGE)}
-                placeholder={LOCAL_ASSETS['terrace-evening.jpg']}
-                style={styles.galleryImage}
-                contentFit="cover"
-                transition={200}
-              />
+              <CatalogImage key={idx} url={photoUri} category={offer.category} style={styles.galleryImage} iconSize={104} />
             ))}
           </ScrollView>
 
@@ -567,6 +559,9 @@ export default function OfferDetailScreen() {
                 </View>
               )}
             </View>
+            {allowsMoreThanTwo && <Text style={{ marginTop: 10, fontSize: 12, color: Palette.mulberry }}>
+              Each extra guest pays {formatNaira(extraGuestPrice)}{(offer.regular_extra_guest_kobo ?? 0) > extraGuestPrice ? ` (usually ${formatNaira(offer.regular_extra_guest_kobo)})` : ''}. Total and savings update as you add guests.
+            </Text>}
           </View>
 
           {/* Party Size Selector Card */}
@@ -1258,7 +1253,7 @@ export default function OfferDetailScreen() {
               >
                 {isSubmitting ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <ActivityIndicator size="small" color={Palette.porcelain} />
+                    <BrandLoader size="small" color={Palette.porcelain} />
                     <Text style={styles.continuePaymentBtnText}>Preparing...</Text>
                   </View>
                 ) : (

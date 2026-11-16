@@ -7,6 +7,7 @@ export interface ServerNotification {
   title: string;
   message: string;
   metadata?: {
+    action?: string;
     reference?: string;
     venueName?: string;
     title?: string;
@@ -29,12 +30,7 @@ export const notificationService = {
    * Fetch authenticated user's notifications stored on the server
    */
   async getNotifications(): Promise<NotificationsResponse> {
-    try {
-      const data = await apiClient<NotificationsResponse>('/api/v1/account/notifications');
-      return data && Array.isArray(data.items) ? data : { unreadCount: 0, items: [] };
-    } catch {
-      return { unreadCount: 0, items: [] };
-    }
+    return apiClient<NotificationsResponse>('/api/v1/account/notifications');
   },
 
   /**
@@ -61,3 +57,11 @@ export const notificationService = {
     }
   },
 };
+
+export function notificationDestination(item: ServerNotification): '/(tabs)/explore' | '/(tabs)/profile' | '/(tabs)/bookings?tab=unpaid' | '/(tabs)/bookings?help=1' | '/(tabs)/bookings' {
+  if (item.type === 'account_welcome' || item.type === 'saved_offer_update') return '/(tabs)/explore';
+  if (item.type === 'security_alert') return '/(tabs)/profile';
+  if (item.type.startsWith('support_')) return '/(tabs)/bookings?help=1';
+  if (item.type === 'payment_pending' || item.type === 'payment_expiring') return '/(tabs)/bookings?tab=unpaid';
+  return '/(tabs)/bookings';
+}

@@ -1,3 +1,5 @@
+import { CatalogImage } from '../../components/CatalogImage';
+import { BrandLoader } from '../../components/BrandLoader';
 import { DataState } from '../../components/DataState';
 import React from 'react';
 import {
@@ -5,7 +7,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
   Linking,
   Share,
@@ -20,8 +21,6 @@ import {
   Share2,
   Navigation,
   ShieldCheck,
-  Clock,
-  ChevronLeft,
 } from 'lucide-react-native';
 import { Palette } from '../../constants/Colors';
 import { formatNaira, resolveImageUrl, Config } from '../../constants/config';
@@ -74,12 +73,11 @@ export default function PartnerDetailScreen() {
   if (isLoading || !partner) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Palette.mulberry} />
+        <BrandLoader size="large" color={Palette.mulberry} />
       </View>
     );
   }
 
-  const banner = resolveImageUrl(partner.banner_url, Config.FALLBACK_VENUE_IMAGE);
   const packages = partner.packages || [];
   const cleanArea = (partner.area || partner.address || 'City Center')
     .replace(/,\s*Lagos/gi, '')
@@ -95,12 +93,7 @@ export default function PartnerDetailScreen() {
       >
         {/* 1. Hero Cover Banner with dark gradient (matching web app) */}
         <View style={styles.heroContainer}>
-          <Image
-            source={resolveImageSource(partner.banner_url, Config.FALLBACK_VENUE_IMAGE)}
-            style={styles.heroImage}
-            contentFit="cover"
-            transition={300}
-          />
+          <CatalogImage url={partner.banner_url} category={partner.primary_category || "venues"} style={styles.heroImage} iconSize={104} />
           <View style={styles.heroScrim} />
 
           {/* Top floating share button */}

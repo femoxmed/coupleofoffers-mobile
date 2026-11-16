@@ -4,8 +4,10 @@ import { Config } from '../constants/config';
 const AUTH_TOKEN_KEY = 'coo_auth_token';
 const AUTH_USER_KEY = 'coo_auth_user';
 let guestCookieCache: string | null = null;
+let authTokenCache: string | null | undefined;
 
 async function getGuestCookie(): Promise<string | null> {
+  if (guestCookieCache) return guestCookieCache;
   try {
     guestCookieCache = (await SecureStore.getItemAsync('coo_guest_cookie')) || guestCookieCache;
   } catch {
@@ -15,12 +17,14 @@ async function getGuestCookie(): Promise<string | null> {
 }
 
 export async function getAuthToken(): Promise<string | null> {
+  if (authTokenCache !== undefined) return authTokenCache;
   try {
     const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
     if (token?.startsWith('demo_tok_')) {
       await removeAuthToken();
       return null;
     }
+    authTokenCache = token;
     return token;
   } catch {
     return null;
@@ -28,6 +32,7 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 export async function setAuthToken(token: string): Promise<void> {
+  authTokenCache = token;
   try {
     await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
   } catch (error) {
@@ -36,9 +41,10 @@ export async function setAuthToken(token: string): Promise<void> {
 }
 
 export async function removeAuthToken(): Promise<void> {
+  authTokenCache = null;
+  guestCookieCache = null;
   try {
-    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
-    await SecureStore.deleteItemAsync(AUTH_USER_KEY);
+    await Promise.all([SecureStore.deleteItemAsync(AUTH_TOKEN_KEY), SecureStore.deleteItemAsync(AUTH_USER_KEY), SecureStore.deleteItemAsync('coo_guest_cookie')]);
   } catch (error) {
     console.error('Failed to remove auth token:', error);
   }
@@ -88,6 +94,7 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
 
   try {
     const response = await fetch(url, {
+      credentials: 'omit',
       ...fetchOptions,
       headers: requestHeaders,
       signal: controller.signal,

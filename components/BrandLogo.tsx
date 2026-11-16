@@ -13,7 +13,7 @@ interface BrandLogoProps {
 export function BrandLogo({
   height = 28,
   letterColor = Palette.aubergine,
-  slogan = 'Great Experiences, Better Offer',
+  slogan = 'Great Experiences, Better Offers',
   showSlogan = true,
 }: BrandLogoProps) {
   return (

@@ -82,16 +82,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    const currentUser = get().user;
     set({ isLoading: true });
+    // Invalidate saved responses immediately, even if server sign-out is offline.
+    const clearingSaved = useSavedStore.getState().clearSaved(currentUser?.email);
     try {
-      const currentUser = get().user;
       await authService.logout();
-      if (currentUser?.email) {
-        await checkoutService.clearUserBookings(currentUser.email);
-      }
-      await useSavedStore.getState().clearSaved(currentUser?.email);
-      set({ user: null, token: null, isLoading: false });
-    } catch {
+    } finally {
+      await Promise.allSettled([
+        clearingSaved,
+        checkoutService.clearUserBookings(currentUser?.email),
+      ]);
       set({ user: null, token: null, isLoading: false });
     }
   },

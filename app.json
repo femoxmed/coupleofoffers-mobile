@@ -10,21 +10,24 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ng.coupleofoffers.mobile",
-      "appleTeamId": "SQ3FWC7Q3B"
+      "appleTeamId": "SQ3FWC7Q3B",
+      "icon": "./assets/images/icon.png",
+      "buildNumber": "2"
     },
     "android": {
       "package": "ng.coupleofoffers.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#FAF5ED",
+        "backgroundColor": "#301D32",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "icon": "./assets/images/icon.png",
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",

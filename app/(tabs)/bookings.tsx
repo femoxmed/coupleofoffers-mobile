@@ -1,3 +1,6 @@
+import { BrandRefreshScrollView } from '../../components/BrandRefreshScrollView';
+import { BrandLoader } from '../../components/BrandLoader';
+import { UnpaidBookingCard } from '../../components/UnpaidBookingCard';
 import { DataState } from '../../components/DataState';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
@@ -6,15 +9,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  RefreshControl,
   Alert,
   Modal,
   Linking,
   TextInput,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Calendar,
@@ -32,7 +33,6 @@ import {
   Mail,
   RotateCcw,
   AlertCircle,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   Send,
@@ -47,7 +47,7 @@ import {
   ConfirmedBooking,
   RescheduleSlotItem,
 } from '../../services/checkoutService';
-import { notificationService, ServerNotification } from '../../services/notificationService';
+import { notificationDestination, notificationService, ServerNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { QRCode } from '../../components/QRCode';
 
@@ -76,12 +76,13 @@ const FAQS = [
 
 export default function BookingsScreen() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{ tab?: string; help?: string }>();
   const user = useAuthStore((s) => s.user);
 
   const [bookings, setBookings] = useState<ConfirmedBooking[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [bookingsError, setBookingsError] = useState(false);
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'refunds'>('upcoming');
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'refunds' | 'unpaid'>('upcoming');
 
   // Modals state
   const [selectedVoucher, setSelectedVoucher] = useState<ConfirmedBooking | null>(null);
@@ -96,6 +97,13 @@ export default function BookingsScreen() {
     items: [],
   });
 
+  useEffect(() => {
+    // Navigation parameters arrive from notification deep links.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (routeParams.tab === 'unpaid') setActiveTab('unpaid');
+    if (routeParams.help === '1') setIsHelpOpen(true);
+  }, [routeParams.tab, routeParams.help]);
+
   const loadBookings = useCallback(async () => {
     if (!user) {
       setBookings([]);
@@ -104,8 +112,10 @@ export default function BookingsScreen() {
     setBookingsError(false);
     try {
       const items = await checkoutService.getBookings(user.email);
+      if (useAuthStore.getState().user?.email !== user.email) return;
       setBookings(items);
     } catch (err) {
+      if (useAuthStore.getState().user?.email !== user.email) return;
       setBookingsError(true);
       setBookings([]);
       console.warn('Error loading bookings:', err);
@@ -119,8 +129,10 @@ export default function BookingsScreen() {
     }
     try {
       const res = await notificationService.getNotifications();
+      if (useAuthStore.getState().user?.email !== user.email) return;
       setServerNotifs(res);
     } catch {
+      if (useAuthStore.getState().user?.email !== user.email) return;
       setServerNotifs({ unreadCount: 0, items: [] });
     }
   }, [user]);
@@ -138,14 +150,21 @@ export default function BookingsScreen() {
     setRefreshing(false);
   };
 
+  useEffect(() => {
+    const refresh = setInterval(() => { void loadBookings(); void loadNotifications(); }, 30_000);
+    return () => clearInterval(refresh);
+  }, [loadBookings, loadNotifications]);
+
   // Group bookings into tabs
-  const { upcomingBookings, pastBookings, refundBookings } = useMemo(() => {
+  const { upcomingBookings, pastBookings, refundBookings, unpaidBookings } = useMemo(() => {
     const up: ConfirmedBooking[] = [];
     const past: ConfirmedBooking[] = [];
     const ref: ConfirmedBooking[] = [];
 
     const now = Date.now();
+    const pending: ConfirmedBooking[] = [];
     for (const b of bookings) {
+      if (b.status === 'pending') { if (b.checkoutExpiresAt && Date.parse(b.checkoutExpiresAt) > now) pending.push(b); continue; }
       const isRefundState = [
         'refund_pending',
         'refund_submitted',
@@ -171,6 +190,7 @@ export default function BookingsScreen() {
       upcomingBookings: up,
       pastBookings: past,
       refundBookings: ref,
+      unpaidBookings: pending,
     };
   }, [bookings]);
 
@@ -179,7 +199,7 @@ export default function BookingsScreen() {
       ? upcomingBookings
       : activeTab === 'past'
       ? pastBookings
-      : refundBookings;
+      : activeTab === 'refunds' ? refundBookings : [];
 
   // 1. UNLOGGED IN: Prompt User to Sign In (Optically centered above floating nav)
   if (!user) {
@@ -237,16 +257,14 @@ export default function BookingsScreen() {
             accessibilityRole="button"
           >
             <Bell size={16} color={Palette.aubergine} />
-            {((serverNotifs?.unreadCount || 0) > 0 || upcomingBookings.length > 0) && (
+            {((serverNotifs?.unreadCount || 0) > 0) && (
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeText}>
                   {serverNotifs.unreadCount > 0
                     ? serverNotifs.unreadCount > 9
                       ? '9+'
                       : serverNotifs.unreadCount
-                    : upcomingBookings.length > 9
-                    ? '9+'
-                    : upcomingBookings.length}
+                    : serverNotifs.unreadCount}
                 </Text>
               </View>
             )}
@@ -281,6 +299,10 @@ export default function BookingsScreen() {
           >
             Upcoming ({upcomingBookings.length})
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.subtab, activeTab === 'unpaid' && styles.subtabActive]} onPress={() => setActiveTab('unpaid')}>
+          <Text style={[styles.subtabText, activeTab === 'unpaid' && styles.subtabTextActive]}>Unpaid ({unpaidBookings.length})</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -320,18 +342,18 @@ export default function BookingsScreen() {
       </View>
 
       {/* Scrollable Bookings List */}
-      <ScrollView
+      <BrandRefreshScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Palette.mulberry}
-          />
-        }
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       >
         {bookingsError && <DataState message="Unable to load bookings." onRetry={() => { void loadBookings(); }} />}
+        {activeTab === 'unpaid' && <View>
+          <Text style={{ color: Palette.mutedText, fontSize: 12, lineHeight: 19, marginBottom: 16 }}>Resume within 48 hours. Price and availability are checked again. A place is reserved only during the active checkout hold.</Text>
+          {unpaidBookings.length === 0 && <Text style={{ color: Palette.mutedText }}>No unpaid bookings.</Text>}
+          {unpaidBookings.map(booking => <UnpaidBookingCard key={booking.reference} booking={booking} refresh={() => { void loadBookings(); }} />)}
+        </View>}
         {/* Policy Highlights Info Bar for Refunds tab */}
         {activeTab === 'refunds' && (
           <View style={styles.policyHighlightCard}>
@@ -346,7 +368,7 @@ export default function BookingsScreen() {
           </View>
         )}
 
-        {displayedList.length > 0 ? (
+        {activeTab === 'unpaid' ? null : displayedList.length > 0 ? (
           displayedList.map((b) => {
             const isRefund = [
               'refund_pending',
@@ -555,7 +577,7 @@ export default function BookingsScreen() {
             )}
           </View>
         )}
-      </ScrollView>
+      </BrandRefreshScrollView>
 
       {/* ========================================================= */}
       {/* MODAL 1: TABLE CHECK-IN PASS & QR CODE MODAL             */}
@@ -789,6 +811,8 @@ export default function BookingsScreen() {
                       await notificationService.markAsRead(item.id);
                       loadNotifications();
                     }
+                    setIsNotifOpen(false);
+                    router.push(notificationDestination(item));
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1088,7 +1112,7 @@ function RescheduleModal({
               <>
                 {loading ? (
                   <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                    <ActivityIndicator size="small" color={Palette.mulberry} />
+                    <BrandLoader size="small" color={Palette.mulberry} />
                     <Text style={{ marginTop: 8, fontSize: 13, color: Palette.mutedText }}>
                       Loading available slots...
                     </Text>
@@ -1192,7 +1216,7 @@ function RescheduleModal({
                       activeOpacity={0.88}
                     >
                       {submitting ? (
-                        <ActivityIndicator color={Palette.porcelain} size="small" />
+                        <BrandLoader color={Palette.porcelain} size="small" />
                       ) : (
                         <Text style={styles.confirmSubmitBtnText}>Confirm New Reservation</Text>
                       )}
@@ -1389,7 +1413,7 @@ function RefundModal({
               activeOpacity={0.88}
             >
               {submitting ? (
-                <ActivityIndicator color={Palette.porcelain} size="small" />
+                <BrandLoader color={Palette.porcelain} size="small" />
               ) : (
                 <Text style={styles.confirmSubmitBtnText}>Submit Cancellation & Refund</Text>
               )}
@@ -1661,7 +1685,7 @@ function HelpDrawer({
                       activeOpacity={0.88}
                     >
                       {submittingTicket ? (
-                        <ActivityIndicator color={Palette.porcelain} size="small" />
+                        <BrandLoader color={Palette.porcelain} size="small" />
                       ) : (
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Send size={15} color={Palette.porcelain} style={{ marginRight: 6 }} />

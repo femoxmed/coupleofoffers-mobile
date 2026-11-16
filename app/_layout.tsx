@@ -1,12 +1,13 @@
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Palette } from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSavedStore } from '../store/useSavedStore';
+import { LaunchSplash } from '../components/LaunchSplash';
 
 export {
   ErrorBoundary,
@@ -19,6 +20,8 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [launching, setLaunching] = useState(true);
+  const finishLaunch = useCallback(() => setLaunching(false), []);
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -46,12 +49,20 @@ export default function RootLayout() {
     useSavedStore.getState().fetchSaved().catch(() => {});
   }, []);
 
+  useEffect(() => useAuthStore.subscribe((state, previous) => {
+    if (state.user?.email === previous.user?.email) return;
+    const privateQuery = (query: { queryKey: readonly unknown[] }) => ['bookings', 'notifications', 'saved-offers'].includes(String(query.queryKey[0]));
+    void queryClient.cancelQueries({ predicate: privateQuery });
+    queryClient.removeQueries({ predicate: privateQuery });
+  }), [queryClient]);
+
   if (!loaded && !error) {
     return null;
   }
 
   return (
     <QueryClientProvider client={queryClient}>
+      <>
       <Stack
         screenOptions={{
           headerStyle: {
@@ -125,6 +136,8 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+      {launching && <LaunchSplash onFinish={finishLaunch} />}
+      </>
     </QueryClientProvider>
   );
 }

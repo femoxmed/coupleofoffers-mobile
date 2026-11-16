@@ -1,3 +1,6 @@
+import { BrandRefreshScrollView } from '../../components/BrandRefreshScrollView';
+import { CatalogImage } from '../../components/CatalogImage';
+import { ExploreInvitation } from '../../components/ExploreInvitation';
 import { DataState } from '../../components/DataState';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -6,9 +9,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  RefreshControl,
   FlatList,
-  TextInput,
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +19,6 @@ import {
   MapPin,
   ChevronDown,
   ChevronRight,
-  ShieldCheck,
   Heart,
   Store,
   Bell,
@@ -30,7 +30,7 @@ import {
 import { Palette } from '../../constants/Colors';
 import { catalogService } from '../../services/catalog';
 import { checkoutService } from '../../services/checkoutService';
-import { notificationService, ServerNotification } from '../../services/notificationService';
+import { notificationDestination, notificationService} from '../../services/notificationService';
 import { useSavedStore } from '../../store/useSavedStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Image } from 'expo-image';
@@ -46,7 +46,7 @@ import {
   FilterState,
   DEFAULT_FILTERS,
 } from '../../components/ThemedSearchBar';
-import { useLocationStore, UserLocation } from '../../store/useLocationStore';
+import { useLocationStore} from '../../store/useLocationStore';
 import { LocationPickerModal } from '../../components/LocationPickerModal';
 import type { Offer, Partner, HomepageSlide } from '../../types';
 
@@ -114,6 +114,7 @@ export default function HomeScreen() {
   // 5. Fetch Server In-App Notifications (strictly for this authenticated user)
   const { data: serverNotifs, refetch: refetchNotifs } = useQuery({
     queryKey: ['notifications', authUser?.email],
+    refetchInterval: 30_000,
     queryFn: async () => {
       if (!authUser) return { unreadCount: 0, items: [] };
       return await notificationService.getNotifications();
@@ -129,7 +130,7 @@ export default function HomeScreen() {
   const totalAlertCount = useMemo(() => {
     if (!authUser) return 0;
     const serverUnread = serverNotifs?.unreadCount || 0;
-    return serverUnread > 0 ? serverUnread : upcomingCount;
+    return serverUnread;
   }, [authUser, serverNotifs, upcomingCount]);
 
   const onRefreshAll = () => {
@@ -206,8 +207,8 @@ export default function HomeScreen() {
           >
             <Heart
               size={16}
-              color={savedCount > 0 ? '#E0245E' : Palette.aubergine}
-              fill={savedCount > 0 ? '#E0245E' : 'transparent'}
+              color={savedCount > 0 ? Palette.saved : Palette.aubergine}
+              fill={savedCount > 0 ? Palette.saved : 'transparent'}
             />
             {savedCount > 0 && (
               <View style={styles.savedBadge}>
@@ -244,16 +245,11 @@ export default function HomeScreen() {
         showFilterChips={true}
       />
 
-      <ScrollView
+      <BrandRefreshScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={onRefreshAll}
-            tintColor={Palette.mulberry}
-          />
-        }
+        refreshing={isRefetching}
+        onRefresh={onRefreshAll}
       >
         {/* 2. Hero Editorial Carousel */}
         {slides && slides.length > 0 ? (
@@ -412,28 +408,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* 7. The Couple Of Offers Promise Card */}
-        <View style={styles.promiseCard}>
-          <View style={styles.promiseIconCircle}>
-            <ShieldCheck size={24} color={Palette.goldInk} />
-          </View>
-          <Text style={styles.promiseTitle}>Know Your Spend Before You Go</Text>
-          <Text style={styles.promiseText}>
-            Every package covers your entire meal, drinks, tax, and service. No bill surprises when you arrive.
-          </Text>
-          <View style={styles.promisePillsRow}>
-            <View style={styles.promisePill}>
-              <Text style={styles.promisePillText}>✓ 100% Guaranteed Pricing</Text>
-            </View>
-            <View style={styles.promisePill}>
-              <Text style={styles.promisePillText}>✓ Handpicked Partners</Text>
-            </View>
-            <View style={styles.promisePill}>
-              <Text style={styles.promisePillText}>✓ Table Booked</Text>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
+        <ExploreInvitation />
+      </BrandRefreshScrollView>
 
       {/* ========================================================= */}
       {/* NOTIFICATIONS & TABLE ALERTS MODAL                       */}
@@ -523,10 +499,8 @@ export default function HomeScreen() {
                           await notificationService.markAsRead(item.id);
                           refetchNotifs();
                         }
-                        if (item.booking_reference) {
-                          setIsNotifModalOpen(false);
-                          router.navigate('/(tabs)/bookings');
-                        }
+                        setIsNotifModalOpen(false);
+                        router.push(notificationDestination(item));
                       }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -629,7 +603,7 @@ export default function HomeScreen() {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={styles.savedModalIconWrap}>
-                  <Heart size={18} color="#E0245E" fill="#E0245E" />
+                  <Heart size={18} color={Palette.saved} fill={Palette.saved} />
                 </View>
                 <View>
                   <Text style={styles.modalTitle}>Saved Experiences</Text>
@@ -660,8 +634,8 @@ export default function HomeScreen() {
               >
                 <Heart
                   size={13}
-                  color={savedModalTab === 'offers' ? '#E0245E' : Palette.mutedText}
-                  fill={savedModalTab === 'offers' ? '#E0245E' : 'transparent'}
+                  color={savedModalTab === 'offers' ? Palette.saved : Palette.mutedText}
+                  fill={savedModalTab === 'offers' ? Palette.saved : 'transparent'}
                 />
                 <Text
                   style={[
@@ -709,12 +683,7 @@ export default function HomeScreen() {
                         router.push(`/offer/${item.id}`);
                       }}
                     >
-                      <Image
-                        source={resolveImageSource(item.image_url, Config.FALLBACK_OFFER_IMAGE)}
-                        style={styles.savedItemThumb}
-                        contentFit="cover"
-                        transition={200}
-                      />
+                      <CatalogImage url={item.image_url} style={styles.savedItemThumb} />
                       <View style={styles.savedItemContent}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Text style={styles.savedItemVenue} numberOfLines={1}>
@@ -752,7 +721,7 @@ export default function HomeScreen() {
                 ) : (
                   <View style={styles.notifEmptyWrap}>
                     <View style={[styles.notifEmptyCircle, { backgroundColor: 'rgba(224, 36, 94, 0.08)' }]}>
-                      <Heart size={28} color="#E0245E" />
+                      <Heart size={28} color={Palette.saved} />
                     </View>
                     <Text style={styles.notifEmptyTitle}>Your wishlist is empty</Text>
                     <Text style={styles.notifEmptyText}>
@@ -929,7 +898,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   savedBadgeText: {
-    color: Palette.porcelain,
+    color: Palette.champagne,
     fontSize: 9,
     fontWeight: '800',
   },

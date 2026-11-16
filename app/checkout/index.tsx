@@ -1,9 +1,9 @@
+import { BrandLoader } from '../../components/BrandLoader';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
   TouchableOpacity,
   Alert,
   SafeAreaView,
@@ -371,7 +371,7 @@ export default function MobileBachsCheckoutScreen() {
       {/* Main Content Area */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Palette.mulberry} />
+          <BrandLoader size="large" color={Palette.mulberry} />
           <Text style={styles.loadingTitle}>Connecting to Bachs</Text>
           <Text style={styles.loadingSub}>
             Generating your encrypted checkout form...
@@ -409,7 +409,7 @@ export default function MobileBachsCheckoutScreen() {
             startInLoadingState={true}
             renderLoading={() => (
               <View style={styles.webViewLoader}>
-                <ActivityIndicator size="large" color={Palette.mulberry} />
+                <BrandLoader size="large" color={Palette.mulberry} />
                 <Text style={styles.webViewLoaderText}>Loading Bachs Checkout...</Text>
               </View>
             )}

@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import { resolveImageUrl, Config } from '../constants/config';
+import { resolveImageUrl } from '../constants/config';
 import type { Offer, Partner, HomepageSlide, SavedOffer, Slot } from '../types';
 
 export type PartnerDetail = Partner & { packages: Offer[]; gallery: string[] };
@@ -8,14 +8,14 @@ type ApiSlot = Slot & { available?: number; booking_closes_at?: string };
 export const catalogService = {
   async getOffers(): Promise<Offer[]> {
     const data = await apiClient<Offer[]>('/api/v1/offers');
-    return data.map(offer => ({ ...offer, image_url: resolveImageUrl(offer.image_url, Config.FALLBACK_OFFER_IMAGE) }));
+    return data.map(offer => ({ ...offer, image_url: offer.image_url ? resolveImageUrl(offer.image_url) : null }));
   },
 
   async getOfferById(id: string): Promise<Offer & { slots: Slot[] }> {
     const data = await apiClient<Offer & { slots: ApiSlot[] }>(`/api/v1/offers/${encodeURIComponent(id)}`);
     return {
       ...data,
-      image_url: resolveImageUrl(data.image_url, Config.FALLBACK_OFFER_IMAGE),
+      image_url: data.image_url ? resolveImageUrl(data.image_url) : null,
       slots: (data.slots || []).map(slot => ({
         ...slot,
         cutoff_at: slot.booking_closes_at ?? slot.cutoff_at,
@@ -26,16 +26,16 @@ export const catalogService = {
 
   async getPartners(): Promise<Partner[]> {
     const data = await apiClient<Partner[]>('/api/v1/partners');
-    return data.map(partner => ({ ...partner, banner_url: resolveImageUrl(partner.banner_url, Config.FALLBACK_VENUE_IMAGE) }));
+    return data.map(partner => ({ ...partner, banner_url: partner.banner_url ? resolveImageUrl(partner.banner_url) : null }));
   },
 
   async getPartnerBySlug(slug: string): Promise<PartnerDetail> {
-    const data = await apiClient<PartnerDetail>(`/api/v1/partners/${encodeURIComponent(slug)}`);
+    const data = await apiClient<Omit<PartnerDetail, 'gallery'> & { gallery?: Array<string | { url: string }> }>(`/api/v1/partners/${encodeURIComponent(slug)}`);
     return {
       ...data,
-      banner_url: resolveImageUrl(data.banner_url, Config.FALLBACK_VENUE_IMAGE),
-      packages: (data.packages || []).map(offer => ({ ...offer, image_url: resolveImageUrl(offer.image_url, Config.FALLBACK_OFFER_IMAGE) })),
-      gallery: data.gallery || [],
+      banner_url: data.banner_url ? resolveImageUrl(data.banner_url) : null,
+      packages: (data.packages || []).map(offer => ({ ...offer, image_url: offer.image_url ? resolveImageUrl(offer.image_url) : null })),
+      gallery: (data.gallery || []).map(photo => typeof photo === 'string' ? photo : photo.url).filter(Boolean),
     };
   },
 
@@ -52,25 +52,20 @@ export const catalogService = {
    */
   async getSavedOffers(): Promise<SavedOffer[]> {
     const data = await apiClient<SavedOffer[]>('/api/v1/account/saved');
-    return data.map(offer => ({ ...offer, image_url: resolveImageUrl(offer.image_url, Config.FALLBACK_OFFER_IMAGE) }));
+    return data.map(offer => ({ ...offer, image_url: offer.image_url ? resolveImageUrl(offer.image_url) : null }));
+  },
+
+  async syncSavedOffers(offerIds: string[]): Promise<SavedOffer[]> {
+    const data = await apiClient<SavedOffer[]>('/api/v1/account/saved/sync', {
+      method: 'POST', body: JSON.stringify({ offerIds }),
+    });
+    return data.map(offer => ({ ...offer, image_url: offer.image_url ? resolveImageUrl(offer.image_url) : null }));
   },
 
   /**
    * Toggle save offer
    */
   async toggleSaveOffer(id: string, save: boolean): Promise<void> {
-    try {
-      await apiClient(`/api/v1/account/saved/${id}`, {
-        method: save ? 'PUT' : 'DELETE',
-      });
-    } catch (err: any) {
-      // If unauthenticated or backend unavailable, let caller know but don't crash
-      if (err?.message?.includes('Unauthorized') || err?.message?.includes('Not Found')) {
-        // Expected when user is browsing as a guest without an account token
-        return;
-      }
-      throw err;
-    }
+    await apiClient(`/api/v1/account/saved/${id}`, { method: save ? 'PUT' : 'DELETE' });
   },
-
 };

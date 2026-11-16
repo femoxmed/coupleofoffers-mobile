@@ -41,6 +41,8 @@ export interface ConfirmedBooking {
     | 'refund_submitted'
     | 'review'
     | 'cancelled';
+  checkoutExpiresAt?: string;
+  canResume?: boolean;
   refundReason?: string;
   refundEligibleAuto?: boolean;
 }
@@ -76,6 +78,10 @@ export const checkoutService = {
       body: JSON.stringify({ requestId, slotId: params.slotId, partySize: params.partySize, expectedTotalKobo: params.totalKobo, email: params.email }),
     });
     return data;
+  },
+
+  async resumeBooking(reference: string): Promise<{ reference: string; authorizationUrl?: string; status?: string }> {
+    return apiClient(`/api/v1/account/bookings/${reference}/resume`, { method: 'POST', body: '{}' });
   },
 
   async verifyBooking(reference: string): Promise<{ status: string; arrivalCode?: string | null }> {
@@ -137,7 +143,9 @@ export const checkoutService = {
             slotTime: slotFormatted,
             startsAt: item.starts_at,
             arrivalPin: item.arrival_code || '',
-            createdAt: item.confirmed_at || '',
+            createdAt: item.created_at || item.confirmed_at || '',
+            checkoutExpiresAt: item.checkout_expires_at,
+            canResume: item.can_resume,
             status: item.status || 'pending',
             refundReason: item.review_reason,
           };
