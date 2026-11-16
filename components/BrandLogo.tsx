@@ -13,14 +13,14 @@ interface BrandLogoProps {
 export function BrandLogo({
   height = 28,
   letterColor = Palette.aubergine,
-  slogan = 'Great experience, better offers',
+  slogan = 'Great Experiences, Better Offer',
   showSlogan = true,
 }: BrandLogoProps) {
   return (
     <View style={styles.container}>
       <BrandWordmark height={height} letterColor={letterColor} />
       {showSlogan && (
-        <Text style={styles.slogan}>{slogan}</Text>
+        <Text style={styles.slogan} numberOfLines={1} ellipsizeMode="clip">{slogan}</Text>
       )}
     </View>
   );
@@ -32,11 +32,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   slogan: {
-    fontSize: 9.5,
+    fontSize: 7,
     fontWeight: '700',
     color: Palette.goldInk,
-    letterSpacing: 0.8,
-    marginTop: 4,
+    letterSpacing: 0.3,
+    marginTop: 2,
     textTransform: 'uppercase',
   },
 });

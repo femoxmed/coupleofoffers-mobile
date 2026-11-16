@@ -3,10 +3,25 @@ import { Config } from '../constants/config';
 
 const AUTH_TOKEN_KEY = 'coo_auth_token';
 const AUTH_USER_KEY = 'coo_auth_user';
+let guestCookieCache: string | null = null;
+
+async function getGuestCookie(): Promise<string | null> {
+  try {
+    guestCookieCache = (await SecureStore.getItemAsync('coo_guest_cookie')) || guestCookieCache;
+  } catch {
+    // Public API requests still work if device storage is unavailable.
+  }
+  return guestCookieCache;
+}
 
 export async function getAuthToken(): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+    const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+    if (token?.startsWith('demo_tok_')) {
+      await removeAuthToken();
+      return null;
+    }
+    return token;
   } catch {
     return null;
   }
@@ -55,6 +70,8 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
 
   const url = path.startsWith('http') ? path : `${Config.API_BASE_URL}${path}`;
   const token = await getAuthToken();
+  const guestCookie = await getGuestCookie();
+  const cookies = [token ? `coo_account=${token}` : '', guestCookie || ''].filter(Boolean).join('; ');
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -63,7 +80,9 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
     'Content-Type': 'application/json',
     Accept: 'application/json',
     'x-coo-account': '1',
-    ...(token ? { Authorization: `Bearer ${token}`, Cookie: `coo_account=${token}` } : {}),
+    ...(url.includes('.ngrok-free.dev/') ? { 'ngrok-skip-browser-warning': 'true' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(cookies ? { Cookie: cookies } : {}),
     ...(headers as Record<string, string>),
   };
 
@@ -75,6 +94,15 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
     });
 
     clearTimeout(timeoutId);
+    const guestSession = response.headers.get('set-cookie')?.match(/coo_guest=[^; ,]+/);
+    if (guestSession) {
+      guestCookieCache = guestSession[0];
+      try {
+        await SecureStore.setItemAsync('coo_guest_cookie', guestCookieCache);
+      } catch {
+        // Keep the real session in memory when persistence is unavailable.
+      }
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();

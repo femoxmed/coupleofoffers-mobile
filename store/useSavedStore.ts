@@ -53,41 +53,18 @@ export const useSavedStore = create<SavedState>((set, get) => ({
   fetchSaved: async (email?: string | null) => {
     set({ isLoading: true, currentUserEmail: email || null });
 
-    // 1. First load from user-isolated device SecureStore
-    const local = await getStoredSavedOffers(email);
-    const current = get().savedOffers;
-    const mergedInitial = new Map<string, SavedOffer>();
-    local.forEach((o) => mergedInitial.set(o.id, o));
-    current.forEach((o) => mergedInitial.set(o.id, o));
-    const combinedInitial = Array.from(mergedInitial.values());
-
-    set({
-      savedOffers: combinedInitial,
-      savedIds: new Set(combinedInitial.map((o) => o.id)),
-    });
-
-    // 2. Sync with the server API (only if authenticated user)
+    set({ savedOffers: [], savedIds: new Set() });
     try {
-      const serverOffers = await catalogService.getSavedOffers();
-      if (Array.isArray(serverOffers)) {
-        const mergedMap = new Map<string, SavedOffer>();
-        // Prefer server state for authenticated accounts
-        serverOffers.forEach((o) => mergedMap.set(o.id, o));
-        // Keep any local unpersisted
-        local.forEach((o) => {
-          if (!mergedMap.has(o.id)) mergedMap.set(o.id, o);
-        });
-
-        const combined = Array.from(mergedMap.values());
-        set({
-          savedOffers: combined,
-          savedIds: new Set(combined.map((o) => o.id)),
-          isLoading: false,
-        });
-        await persistSavedOffers(combined, email);
+      let offers: SavedOffer[];
+      if (email) {
+        offers = await catalogService.getSavedOffers();
       } else {
-        set({ isLoading: false });
+        const stored = await getStoredSavedOffers();
+        const ids = new Set(stored.map(offer => offer.id));
+        offers = (await catalogService.getOffers()).filter(offer => ids.has(offer.id));
       }
+      set({ savedOffers: offers, savedIds: new Set(offers.map(offer => offer.id)), isLoading: false });
+      await persistSavedOffers(offers, email);
     } catch {
       set({ isLoading: false });
     }

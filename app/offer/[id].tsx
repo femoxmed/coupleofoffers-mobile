@@ -1,3 +1,4 @@
+import { DataState } from '../../components/DataState';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
@@ -87,7 +88,7 @@ export default function OfferDetailScreen() {
     }
   }, [authUser?.email]);
 
-  const { data: offer, isLoading } = useQuery<ExtendedOffer>({
+  const { data: offer, isLoading, refetch } = useQuery<ExtendedOffer>({
     queryKey: ['offer', id],
     queryFn: async () => {
       if (!id) throw new Error('Missing ID');
@@ -97,8 +98,8 @@ export default function OfferDetailScreen() {
   });
 
   const basePartySize = offer?.party_size || 2;
-  const maxPartySize = offer?.max_party_size || 6;
-  const extraGuestPrice = offer?.extra_friend_price_kobo || 2000000;
+  const maxPartySize = offer?.max_party_size ?? basePartySize;
+  const extraGuestPrice = offer?.extra_friend_price_kobo ?? 0;
   const allowsMoreThanTwo =
     maxPartySize > basePartySize || (offer?.extra_friend_price_kobo || 0) > 0;
 
@@ -121,34 +122,7 @@ export default function OfferDetailScreen() {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // Robust slots collection: use offer.slots if provided, otherwise generate rich daily arrival slots for the next 30 days
-  const allSlots = useMemo<Slot[]>(() => {
-    if (offer?.slots && offer.slots.length > 0) {
-      return offer.slots;
-    }
-    const generated: Slot[] = [];
-    const now = new Date();
-    const times = ['12:30', '14:00', '18:00', '19:30', '21:00'];
-    for (let dayOffset = 0; dayOffset <= 30; dayOffset++) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateKey = `${y}-${m}-${day}`;
-
-      times.forEach((t, tIdx) => {
-        generated.push({
-          id: `slot-${dateKey}-${tIdx}`,
-          offer_id: offer?.id || id || '',
-          starts_at: `${dateKey}T${t}:00+01:00`,
-          cutoff_at: `${dateKey}T10:00:00+01:00`,
-          remaining_units: Math.floor(Math.random() * 4) + 3,
-          capacity_units: 8,
-        });
-      });
-    }
-    return generated;
-  }, [offer?.slots, offer?.id, id]);
+  const allSlots = useMemo<Slot[]>(() => offer?.slots || [], [offer?.slots]);
 
   // Group slots by date string YYYY-MM-DD
   const slotsByDate = useMemo(() => {
@@ -173,21 +147,18 @@ export default function OfferDetailScreen() {
 
   // Initialize party size, branch, date and slot
   useEffect(() => {
-    if (offer?.party_size && partySize < offer.party_size) {
+    if (offer?.party_size && (partySize < offer.party_size || partySize > maxPartySize)) {
       setPartySize(offer.party_size);
     }
     if (branches.length > 0 && !selectedBranchId) {
-      setSelectedBranchId(branches[0].id);
+      setSelectedBranchId(offer?.venue_id || branches[0].id);
     }
-  }, [offer, branches, selectedBranchId, partySize]);
+  }, [offer, branches, selectedBranchId, partySize, maxPartySize]);
 
   useEffect(() => {
     if (!selectedDate && firstAvailableDate) {
       setSelectedDate(firstAvailableDate);
-      const slotsOnDay = slotsByDate[firstAvailableDate] || [];
-      if (slotsOnDay.length > 0 && !selectedSlot) {
-        setSelectedSlot(slotsOnDay[0].id);
-      }
+      // Do NOT auto-select a slot — the user must consciously pick their arrival time
     }
   }, [firstAvailableDate, selectedDate, slotsByDate, selectedSlot]);
 
@@ -302,10 +273,8 @@ export default function OfferDetailScreen() {
   // Clean venue name & address to strictly adhere to brand guidelines (NO Lagos mentions)
   const cleanVenueName = useMemo(() => {
     return (offer?.venue_name || offer?.venue || '')
-      .replace(/Sample\s*Lagos\s*experiences/gi, 'Curated Experiences')
-      .replace(/,\s*Lagos/gi, '')
+        .replace(/,\s*Lagos/gi, '')
       .replace(/Lagos/gi, '')
-      .replace(/[\s•\-–—]*demo\b/gi, '')
       .trim() || 'Curated Venue';
   }, [offer]);
 
@@ -315,7 +284,6 @@ export default function OfferDetailScreen() {
       .replace(/,\s*Lagos/gi, '')
       .replace(/Lagos/gi, '')
       .replace(/,\s*Nigeria/gi, '')
-      .replace(/[\s•\-–—]*demo\b/gi, '')
       .trim();
   }, [offer]);
 
@@ -359,8 +327,21 @@ export default function OfferDetailScreen() {
       return;
     }
 
+    if (!selectedDate) {
+      Alert.alert('Select Arrival Date', 'Please pick your arrival date before proceeding.');
+      return;
+    }
+
     if (!selectedSlot) {
-      Alert.alert('Select Date & Time', 'Please select your arrival date and time slot.');
+      Alert.alert('Select Arrival Time', 'Please pick your arrival time slot before proceeding.');
+      return;
+    }
+
+    // Verify the selected slot is still valid for the chosen date
+    const slotsForSelectedDate = slotsByDate[selectedDate] || [];
+    const isSlotStillValid = slotsForSelectedDate.some((s) => s.id === selectedSlot);
+    if (!isSlotStillValid) {
+      Alert.alert('Time Slot Unavailable', 'The selected time slot is no longer available. Please pick another time.');
       return;
     }
 
@@ -412,6 +393,7 @@ export default function OfferDetailScreen() {
         pathname: '/checkout',
         params: {
           authUrl: res.authorizationUrl,
+          reference: res.reference,
           offerId: offer?.id || id || '',
           slotId: selectedSlot,
           partySize: partySize.toString(),
@@ -433,6 +415,10 @@ export default function OfferDetailScreen() {
       setIsSubmitting(false);
     }
   };
+
+  if (!isLoading && !offer) {
+    return <DataState message="Unable to load this offer." onRetry={() => { void refetch(); }} />;
+  }
 
   if (isLoading || !offer) {
     return (
@@ -746,7 +732,10 @@ export default function OfferDetailScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() => setIsBookingModalVisible(true)}
+          onPress={() => {
+            setSelectedSlot(null);
+            setIsBookingModalVisible(true);
+          }}
           style={styles.bookButton}
           activeOpacity={0.88}
         >
@@ -846,6 +835,11 @@ export default function OfferDetailScreen() {
                             onPress={() => {
                               setSelectedBranchId(b.id);
                               setIsBranchDropdownOpen(false);
+                              if (b.offer_id !== offer.id) {
+                                setSelectedSlot(null);
+                                setSelectedDate('');
+                                router.replace(`/offer/${b.offer_id}`);
+                              }
                             }}
                             style={[
                               styles.dropdownItem,
@@ -1111,7 +1105,7 @@ export default function OfferDetailScreen() {
                             ? slot.remaining_units
                             : typeof (slot as any).available === 'number' && !isNaN((slot as any).available)
                             ? (slot as any).available
-                            : 4;
+                            : 0;
                         return (
                           <TouchableOpacity
                             key={slot.id}
@@ -1258,6 +1252,7 @@ export default function OfferDetailScreen() {
                 style={[
                   styles.continuePaymentBtn,
                   isSubmitting && { opacity: 0.7 },
+                  (!selectedDate || !selectedSlot) && { opacity: 0.45 },
                 ]}
                 activeOpacity={0.88}
               >
@@ -1268,7 +1263,9 @@ export default function OfferDetailScreen() {
                   </View>
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.continuePaymentBtnText}>Continue to Payment</Text>
+                    <Text style={styles.continuePaymentBtnText}>
+                      {!selectedDate ? 'Select a Date' : !selectedSlot ? 'Select a Time' : 'Checkout'}
+                    </Text>
                     <ArrowRight size={16} color={Palette.porcelain} />
                   </View>
                 )}

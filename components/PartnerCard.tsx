@@ -22,22 +22,18 @@ export function PartnerCard({ partner, width }: PartnerCardProps) {
 
   const bannerSource = resolveImageSource(partner.banner_url, Config.FALLBACK_VENUE_IMAGE);
 
-  // Clean area string (remove any "Lagos" or "Demo" suffix or mention)
+  // Keep the area label compact.
   const rawArea = partner.area || partner.address || 'City Center';
   const cleanArea =
     rawArea
       .replace(/,\s*Lagos/gi, '')
       .replace(/Lagos/gi, '')
       .replace(/,\s*Nigeria/gi, '')
-      .replace(/[\s•\-–—]*demo\b/gi, '')
       .trim() || 'City Center';
 
   const isFullWidth = width === undefined;
 
-  const cleanPartnerName = partner.name
-    .replace(/Sample\s*Lagos\s*experiences/gi, 'Curated Experiences')
-    .replace(/[\s•\-–—]*demo\b/gi, '')
-    .trim();
+  const cleanPartnerName = partner.name.trim();
 
   return (
     <TouchableOpacity
@@ -82,12 +78,14 @@ export function PartnerCard({ partner, width }: PartnerCardProps) {
           <Text style={styles.venueName} numberOfLines={1}>
             {cleanPartnerName}
           </Text>
-          <View style={styles.priceCol}>
-            <Text style={styles.priceLabel}>From </Text>
-            <Text style={styles.priceText}>
-              {formatNaira(partner.starting_price_kobo || 3200000)}
-            </Text>
-          </View>
+          {partner.starting_price_kobo != null && (
+            <View style={styles.priceCol}>
+              <Text style={styles.priceLabel}>From </Text>
+              <Text style={styles.priceText}>
+                {formatNaira(partner.starting_price_kobo)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Row 2: Location Area + View Dates Button */}

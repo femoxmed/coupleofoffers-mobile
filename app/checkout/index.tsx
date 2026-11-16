@@ -28,7 +28,7 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import { Palette } from '../../constants/Colors';
 import { formatNaira } from '../../constants/config';
-import { checkoutService, ConfirmedBooking } from '../../services/checkoutService';
+import { checkoutService } from '../../services/checkoutService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { QRCode } from '../../components/QRCode';
 
@@ -45,6 +45,7 @@ export default function MobileBachsCheckoutScreen() {
     venueAddress?: string;
     slotTime?: string;
     holdId?: string;
+    reference?: string;
   }>();
 
   const router = useRouter();
@@ -54,13 +55,13 @@ export default function MobileBachsCheckoutScreen() {
   const [loading, setLoading] = useState(!params.authUrl);
   const [error, setError] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [arrivalPin, setArrivalPin] = useState<string>('7429');
+  const [arrivalPin, setArrivalPin] = useState<string>('');
   const [reference, setReference] = useState<string>(
-    `coo_${Date.now().toString().slice(-6)}`
+    params.reference || ''
   );
   const [secondsRemaining, setSecondsRemaining] = useState(300); // 5 min hold timer
 
-  const amountKobo = Number(params.amountKobo) || 4600000;
+  const amountKobo = Number(params.amountKobo) || 0;
   const partySize = Number(params.partySize) || 2;
   const userEmail = (params.email || authUser?.email || 'guest@coupleofoffers.ng').trim();
 
@@ -82,7 +83,7 @@ export default function MobileBachsCheckoutScreen() {
       setError(null);
       try {
         const res = await checkoutService.initBachsCheckout({
-          offerId: params.offerId || 'offer-1',
+          offerId: params.offerId || '',
           slotId: params.slotId,
           partySize,
           totalKobo: amountKobo,
@@ -96,7 +97,6 @@ export default function MobileBachsCheckoutScreen() {
         if (active) {
           setAuthUrl(res.authorizationUrl);
           setReference(res.reference);
-          setArrivalPin(res.arrivalPin);
         }
       } catch (err: any) {
         console.error('Mobile Bachs checkout init error:', err);
@@ -118,25 +118,18 @@ export default function MobileBachsCheckoutScreen() {
 
   const handlePaymentSuccess = async () => {
     if (paymentSuccess) return;
-    setPaymentSuccess(true);
-
-    // Save confirmed booking to persistent local store
-    const booking: ConfirmedBooking = {
-      id: reference,
-      reference,
-      offerId: params.offerId || 'offer-1',
-      offerTitle: params.offerTitle || 'Curated Date Experience',
-      venueName: cleanVenue(params.venueName || 'Partner Venue'),
-      venueAddress: cleanVenue(params.venueAddress || ''),
-      partySize,
-      amountKobo,
-      email: userEmail,
-      slotTime: params.slotTime || 'Today, 8:00 PM',
-      arrivalPin,
-      createdAt: new Date().toISOString(),
-      status: 'confirmed',
-    };
-    await checkoutService.saveBooking(booking);
+    try {
+      if (!reference) throw new Error('Missing booking reference.');
+      const receipt = await checkoutService.verifyBooking(reference);
+      if (receipt.status !== 'confirmed') {
+        Alert.alert('Payment awaiting confirmation', 'Your payment has not been confirmed yet. Check your bookings again shortly.');
+        return;
+      }
+      setArrivalPin(receipt.arrivalCode || '');
+      setPaymentSuccess(true);
+    } catch (err) {
+      Alert.alert('Could not verify payment', err instanceof Error ? err.message : 'Please check your bookings.');
+    }
   };
 
   const handleNavigationStateChange = (navState: any) => {
@@ -185,10 +178,8 @@ export default function MobileBachsCheckoutScreen() {
 
   function cleanVenue(text: string) {
     return text
-      .replace(/Sample\s*Lagos\s*experiences/gi, 'Curated Experiences')
-      .replace(/,\s*Lagos.*$/i, '')
+        .replace(/,\s*Lagos.*$/i, '')
       .replace(/Lagos/gi, '')
-      .replace(/[\s•\-–—]*demo\b/gi, '')
       .trim();
   }
 
@@ -217,7 +208,7 @@ export default function MobileBachsCheckoutScreen() {
             </Text>
 
             {/* 4-Digit Arrival Code & QR Scan Pass Golden Card */}
-            <View style={styles.arrivalPinCard}>
+            {arrivalPin && <View style={styles.arrivalPinCard}>
               <View style={styles.pinHeaderRow}>
                 <Text style={styles.pinHeaderLabel}>YOUR ARRIVAL CHECK-IN CODE</Text>
               </View>
@@ -253,7 +244,7 @@ export default function MobileBachsCheckoutScreen() {
               <Text style={styles.pinInstructions}>
                 Show this 4-digit code or let the host scan your QR pass upon arrival at the venue.
               </Text>
-            </View>
+            </View>}
 
             {/* Receipt Breakdown Card */}
             <View style={styles.receiptSummary}>

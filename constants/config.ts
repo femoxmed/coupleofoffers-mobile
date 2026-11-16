@@ -1,5 +1,5 @@
 export const Config = {
-  API_BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'https://frays-operate-grill.ngrok-free.dev',
+  API_BASE_URL: (process.env.EXPO_PUBLIC_API_URL || 'https://frays-operate-grill.ngrok-free.dev').replace(/\/+$/, ''),
   WEB_BASE_URL: process.env.EXPO_PUBLIC_WEB_URL || 'http://localhost:3003',
   CURRENCY_SYMBOL: '₦',
   FALLBACK_HERO_IMAGE: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1000&q=80',

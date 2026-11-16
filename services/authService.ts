@@ -3,7 +3,6 @@ import {
   setAuthToken,
   removeAuthToken,
   setStoredUser,
-  getStoredUser,
   getAuthToken,
 } from './apiClient';
 
@@ -54,23 +53,6 @@ export const authService = {
 
       return user;
     } catch (err: any) {
-      // In dev or sandbox test mode with demo credentials, provide instant fallback
-      if (
-        password.length >= 6 &&
-        (trimmedEmail.includes('demo') || trimmedEmail.includes('test') || trimmedEmail.includes('couple'))
-      ) {
-        const demoUser: AuthUser = {
-          email: trimmedEmail,
-          name: trimmedEmail.split('@')[0],
-          role: 'customer',
-          is_partner: false,
-          is_admin: false,
-        };
-        const mockToken = `demo_tok_${Date.now()}`;
-        await setAuthToken(mockToken);
-        await setStoredUser(demoUser);
-        return demoUser;
-      }
       throw err;
     }
   },
@@ -111,20 +93,6 @@ export const authService = {
 
       return user;
     } catch (err: any) {
-      // In dev fallback mode
-      if (err.message?.includes('timed out') || err.message?.includes('Network request failed')) {
-        const demoUser: AuthUser = {
-          email: trimmedEmail,
-          name: name?.trim() || trimmedEmail.split('@')[0],
-          role,
-          is_partner: role === 'restaurant',
-          is_admin: false,
-        };
-        const mockToken = `demo_tok_${Date.now()}`;
-        await setAuthToken(mockToken);
-        await setStoredUser(demoUser);
-        return demoUser;
-      }
       throw err;
     }
   },
@@ -161,7 +129,8 @@ export const authService = {
       }>('/api/v1/account');
 
       if (!data?.email) {
-        return await getStoredUser<AuthUser>();
+        await removeAuthToken();
+        return null;
       }
 
       const user: AuthUser = {
@@ -175,7 +144,7 @@ export const authService = {
       await setStoredUser(user);
       return user;
     } catch {
-      return await getStoredUser<AuthUser>();
+      return null;
     }
   },
 };

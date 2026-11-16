@@ -45,29 +45,18 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
     .replace(/,\s*Lagos/gi, '')
     .replace(/Lagos/gi, '')
     .replace(/,\s*Nigeria/gi, '')
-    .replace(/[\s•\-–—]*demo\b/gi, '')
     .trim();
 
   const cleanVenueName = (offer.venue_name || offer.venue || '')
-    .replace(/Sample\s*Lagos\s*experiences/gi, 'Curated Experiences')
     .replace(/,\s*Lagos/gi, '')
     .replace(/Lagos/gi, '')
-    .replace(/[\s•\-–—]*demo\b/gi, '')
     .trim() || 'Curated Venue';
 
-  // If the restaurant allows more than 2, then 'For 2' becomes 'From 2'
-  const allowsMoreThanTwo =
-    (offer.max_party_size || 0) > 2 ||
+  const allowsExtraGuests =
+    (offer.max_party_size || 0) > offer.party_size ||
     (offer.extra_friend_price_kobo || 0) > 0;
 
-  const partyBadgeLabel =
-    offer.party_size === 2
-      ? allowsMoreThanTwo
-        ? 'From 2'
-        : 'For 2'
-      : allowsMoreThanTwo
-      ? `From ${offer.party_size}`
-      : `Party of ${offer.party_size}`;
+  const partyBadgeLabel = `${allowsExtraGuests ? 'From' : 'For'} ${offer.party_size} ${offer.party_size === 1 ? 'person' : 'persons'}`;
 
   // Compact Modern Card Layout (horizontal, sleek, luxury)
   if (layout === 'compact') {

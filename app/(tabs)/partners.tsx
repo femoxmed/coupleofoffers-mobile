@@ -1,3 +1,4 @@
+import { DataState } from '../../components/DataState';
 import React, { useState, useMemo } from 'react';
 import {
   View,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Palette } from '../../constants/Colors';
-import { catalogService, DEMO_PARTNERS } from '../../services/catalog';
+import { catalogService } from '../../services/catalog';
 import { PartnerCard } from '../../components/PartnerCard';
 import {
   ThemedSearchBar,
@@ -23,19 +24,12 @@ export default function PartnersScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
-  const { data: partners, isLoading, isRefetching, refetch } = useQuery<Partner[]>({
+  const { data: partners, isLoading, isRefetching, isError, refetch } = useQuery<Partner[]>({
     queryKey: ['partners'],
-    queryFn: async () => {
-      try {
-        const live = await catalogService.getPartners();
-        return live && live.length > 0 ? live : DEMO_PARTNERS;
-      } catch {
-        return DEMO_PARTNERS;
-      }
-    },
+    queryFn: () => catalogService.getPartners(),
   });
 
-  const partnerList = partners || DEMO_PARTNERS;
+  const partnerList = partners || [];
 
   // Extract distinct clean areas
   const areas = useMemo(() => {
@@ -44,8 +38,7 @@ export default function PartnersScreen() {
       const a = (p.area || p.address || '')
         .replace(/,\s*Lagos/gi, '')
         .replace(/Lagos/gi, '')
-        .replace(/[\s•\-–—]*demo\b/gi, '')
-        .trim();
+          .trim();
       if (a) set.add(a.split(',')[0].trim());
     });
     return ['All Areas', ...Array.from(set)];
@@ -135,7 +128,7 @@ export default function PartnersScreen() {
           </View>
         }
         ListEmptyComponent={
-          isLoading ? (
+          isError ? <DataState message="Unable to load data. Check your connection and try again." onRetry={() => { void refetch(); }} /> : isLoading ? (
             <View style={styles.centered}>
               <ActivityIndicator size="large" color={Palette.mulberry} />
             </View>

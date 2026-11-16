@@ -1,3 +1,4 @@
+import { DataState } from '../../components/DataState';
 import React from 'react';
 import {
   View,
@@ -25,9 +26,8 @@ import {
 import { Palette } from '../../constants/Colors';
 import { formatNaira, resolveImageUrl, Config } from '../../constants/config';
 import { resolveImageSource } from '../../constants/images';
-import { catalogService, DEMO_PARTNERS } from '../../services/catalog';
+import { catalogService, type PartnerDetail } from '../../services/catalog';
 import { OfferCard } from '../../components/OfferCard';
-import type { Partner, Offer } from '../../types';
 
 function getInitials(name: string) {
   return (
@@ -40,18 +40,11 @@ function getInitials(name: string) {
   );
 }
 
-const AMBIANCE_GALLERY = [
-  'terrace-evening.jpg',
-  'dining-room.jpg',
-  'partner-banner.jpg',
-  'group-friends-dining.jpg',
-];
-
 export default function PartnerDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
 
-  const { data: partner, isLoading } = useQuery<Partner & { packages?: Offer[] }>({
+  const { data: partner, isLoading, refetch } = useQuery<PartnerDetail>({
     queryKey: ['partner', slug],
     queryFn: async () => {
       if (!slug) throw new Error('Missing slug');
@@ -73,6 +66,10 @@ export default function PartnerDetailScreen() {
     const destination = encodeURIComponent(partner.address || partner.name);
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${destination}`);
   };
+
+  if (!isLoading && !partner) {
+    return <DataState message="Unable to load this partner." onRetry={() => { void refetch(); }} />;
+  }
 
   if (isLoading || !partner) {
     return (
@@ -147,7 +144,7 @@ export default function PartnerDetailScreen() {
               </View>
 
               <Text style={styles.partnerName} numberOfLines={2}>
-                {partner.name.replace(/[\s•\-–—]*demo\b/gi, '').trim()}
+                {partner.name}
               </Text>
 
               <View style={styles.areaRow}>
@@ -182,14 +179,14 @@ export default function PartnerDetailScreen() {
         </View>
 
         {/* 3. Venue Ambiance Photo Gallery */}
-        <View style={styles.gallerySection}>
+        {partner.gallery.length > 0 && <View style={styles.gallerySection}>
           <Text style={styles.sectionHeaderTitle}>Venue Ambiance</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.galleryScroll}
           >
-            {AMBIANCE_GALLERY.map((imgUrl, idx) => (
+            {partner.gallery.map((imgUrl, idx) => (
               <View key={idx} style={styles.galleryItemWrapper}>
                 <Image
                   source={resolveImageSource(imgUrl, Config.FALLBACK_OFFER_IMAGE)}
@@ -200,20 +197,20 @@ export default function PartnerDetailScreen() {
               </View>
             ))}
           </ScrollView>
-        </View>
+        </View>}
 
         {/* 4. Starting Price & Trust Promise Card */}
         <View style={styles.pricingHighlightCard}>
           <View>
             <Text style={styles.pricingLabel}>Packages from</Text>
             <Text style={styles.pricingAmount}>
-              {formatNaira(partner.starting_price_kobo || 3200000)}
+              {partner.starting_price_kobo == null ? 'No offers available' : formatNaira(partner.starting_price_kobo)}
             </Text>
           </View>
 
           <View style={styles.pricingTrustPill}>
             <ShieldCheck size={14} color={Palette.mulberry} style={{ marginRight: 4 }} />
-            <Text style={styles.pricingTrustText}>All-inclusive for two</Text>
+            <Text style={styles.pricingTrustText}>Upfront package pricing</Text>
           </View>
         </View>
 

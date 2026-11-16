@@ -35,7 +35,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const user = await authService.getMe();
-      set({ user, token, isInitialized: true });
+      set({ user, token: user ? token : null, isInitialized: true });
       if (user?.email) {
         useSavedStore.getState().fetchSaved(user.email);
       }

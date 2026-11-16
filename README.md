@@ -4,9 +4,11 @@ Luxury mobile application for **Couple Of Offers**, built with **Expo (SDK 58)**
 
 ---
 
-## Live API Configuration
+## API Configuration
 
-- **API Base URL:** `https://frays-operate-grill.ngrok-free.dev`
+Copy `.env.example` to `.env`, configure your API, then restart Expo. Create test data with the [API development seeder](../api/docs/seeding.md). The app contains no demo catalogue or offline booking simulation.
+
+- **API Base URL:** set `EXPO_PUBLIC_API_URL` in `.env`. The current development default is `https://frays-operate-grill.ngrok-free.dev`. On a physical phone, use a reachable HTTPS tunnel or your computer's LAN IP.
 - **Prefix:** `/api/v1`
 - **Live Connected Endpoints:**
   - `GET /api/v1/homepage-slides` (Dynamic hero editorial carousel)
@@ -14,8 +16,9 @@ Luxury mobile application for **Couple Of Offers**, built with **Expo (SDK 58)**
   - `GET /api/v1/partners` (Public venue directory & starting prices)
   - `GET /api/v1/partners/:slug` (Individual venue profile & available packages)
   - `GET /api/v1/offers/:id` (Offer details, inclusions, & live slot capacity)
-  - `POST /api/v1/holds` (5-minute slot hold reservation)
-  - `POST /api/v1/payments/initialize` (Paystack authorization URL)
+  - `POST /api/v1/offers/session` (Guest checkout session)
+  - `POST /api/v1/offers/:id/checkout` (Validated price, inventory hold and payment initialization)
+  - `GET /api/v1/offers/bookings/:reference` (Server-verified receipt)
 
 ---
 

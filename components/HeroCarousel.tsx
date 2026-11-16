@@ -246,9 +246,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     backgroundColor: Palette.champagne,
-    paddingHorizontal: 13,
-    paddingVertical: 6,
-    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 22,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.12,
@@ -256,8 +256,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   actionButtonText: {
-    fontSize: 11.5,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: Palette.aubergine,
   },
   paginationRow: {

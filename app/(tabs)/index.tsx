@@ -1,3 +1,4 @@
+import { DataState } from '../../components/DataState';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -27,7 +28,7 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { Palette } from '../../constants/Colors';
-import { catalogService, DEMO_PARTNERS, WEB_HOMEPAGE_SLIDES } from '../../services/catalog';
+import { catalogService } from '../../services/catalog';
 import { checkoutService } from '../../services/checkoutService';
 import { notificationService, ServerNotification } from '../../services/notificationService';
 import { useSavedStore } from '../../store/useSavedStore';
@@ -73,28 +74,22 @@ export default function HomeScreen() {
   }, [fetchSaved, authUser?.email]);
 
   // 1. Fetch Homepage Hero Slides (exact match with web app)
-  const { data: slides, refetch: refetchSlides } = useQuery<HomepageSlide[]>({
+  const { data: slides, isError: slidesError, refetch: refetchSlides } = useQuery<HomepageSlide[]>({
     queryKey: ['homepage-slides'],
     queryFn: () => catalogService.getHomepageSlides(),
-    initialData: WEB_HOMEPAGE_SLIDES,
   });
 
   // 2. Fetch Featured Partners
-  const { data: partners, refetch: refetchPartners } = useQuery<Partner[]>({
+  const { data: partners, isLoading: partnersLoading, isError: partnersError, refetch: refetchPartners } = useQuery<Partner[]>({
     queryKey: ['partners'],
-    queryFn: async () => {
-      try {
-        const list = await catalogService.getPartners();
-        return list && list.length > 0 ? list : DEMO_PARTNERS;
-      } catch {
-        return DEMO_PARTNERS;
-      }
-    },
+    queryFn: () => catalogService.getPartners(),
   });
 
   // 3. Fetch Offers
   const {
     data: offers,
+    isLoading: offersLoading,
+    isError: offersError,
     isRefetching,
     refetch: refetchOffers,
   } = useQuery<Offer[]>({
@@ -238,6 +233,17 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Fixed Search Bar - always visible above scroll content */}
+      <ThemedSearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        onSubmit={handleSearchSubmit}
+        placeholder="Search experiences, venues, or areas..."
+        filters={filters}
+        onApplyFilters={handleApplyFilters}
+        showFilterChips={true}
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -249,17 +255,6 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Reusable Themed Search Bar with Filter in the Search Box (First on Homepage) */}
-        <ThemedSearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onSubmit={handleSearchSubmit}
-          placeholder="Search experiences, venues, or areas..."
-          filters={filters}
-          onApplyFilters={handleApplyFilters}
-          showFilterChips={true}
-        />
-
         {/* 2. Hero Editorial Carousel */}
         {slides && slides.length > 0 ? (
           <HeroCarousel
@@ -278,9 +273,11 @@ export default function HomeScreen() {
           }}
         />
 
+        {slidesError && <DataState message="Unable to load homepage slides." onRetry={() => { void refetchSlides(); }} />}
+
         {/* 4. Featured Partners Section */}
         <View style={styles.sectionHeaderRow}>
-          <View>
+          <View style={styles.sectionHeading}>
             <View style={styles.titleBadgeRow}>
               <Store size={14} color={Palette.mulberry} style={{ marginRight: 5 }} />
               <Text style={styles.sectionTitle}>Featured Partners</Text>
@@ -300,10 +297,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {(partnersLoading || partnersError || partners?.length === 0) && (
+          <DataState loading={partnersLoading} message={partnersLoading ? 'Loading partners...' : partnersError ? 'Unable to load partners.' : 'No partners available yet.'} onRetry={partnersError ? () => { void refetchPartners(); } : undefined} />
+        )}
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={partners || DEMO_PARTNERS}
+          data={partners || []}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <PartnerCard partner={item} width={260} />}
           contentContainerStyle={styles.partnersList}
@@ -311,7 +311,7 @@ export default function HomeScreen() {
 
         {/* 5. Signature Date Experiences (Compact Layout) */}
         <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
-          <View>
+          <View style={styles.sectionHeading}>
             <View style={styles.titleBadgeRow}>
               <Text style={styles.sectionTitle}>Featured Date Packages</Text>
             </View>
@@ -330,11 +330,22 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {(offersLoading || offersError || offers?.length === 0) && (
+          <DataState loading={offersLoading} message={offersLoading ? 'Loading offers...' : offersError ? 'Unable to load offers.' : 'No offers available yet.'} onRetry={offersError ? () => { void refetchOffers(); } : undefined} />
+        )}
         <View style={styles.offersCompactList}>
           {featuredOffers.map((offer) => (
             <OfferCard key={offer.id} offer={offer} layout="compact" />
           ))}
         </View>
+
+        <TouchableOpacity
+          style={styles.browseAllBtn}
+          onPress={() => router.push('/(tabs)/explore')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.browseAllBtnText}>Browse all experiences →</Text>
+        </TouchableOpacity>
 
         {/* 6. Destination for Curated Experiences & Marketplace Categories */}
         <View style={styles.categoriesSection}>
@@ -394,6 +405,7 @@ export default function HomeScreen() {
                   <Text style={styles.categoryCardSubtitle} numberOfLines={2}>
                     {cat.sub}
                   </Text>
+                  <Text style={styles.categoryCardBrowse}>Browse experiences →</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -859,7 +871,7 @@ const styles = StyleSheet.create({
   },
   masthead: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -872,6 +884,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    overflow: 'visible',
+    paddingTop: 0,
+    paddingRight: 4,
   },
   locationPill: {
     flexDirection: 'row',
@@ -1020,11 +1035,16 @@ const styles = StyleSheet.create({
   },
   sectionHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     marginTop: 18,
     marginBottom: 10,
+  },
+  sectionHeading: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 12,
   },
   titleBadgeRow: {
     flexDirection: 'row',
@@ -1043,6 +1063,7 @@ const styles = StyleSheet.create({
   },
   seeAllButton: {
     flexDirection: 'row',
+    flexShrink: 0,
     alignItems: 'center',
     paddingVertical: 4,
   },
@@ -1114,6 +1135,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Palette.mutedText,
     lineHeight: 15,
+  },
+  categoryCardBrowse: {
+    fontSize: 11,
+    color: Palette.mulberry,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  browseAllBtn: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingVertical: 12,
+    borderRadius: 50,
+    borderWidth: 1.5,
+    borderColor: Palette.mulberry,
+    alignItems: 'center',
+  },
+  browseAllBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Palette.mulberry,
   },
   promiseCard: {
     marginHorizontal: 16,

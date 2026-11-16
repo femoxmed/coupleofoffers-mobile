@@ -1,3 +1,4 @@
+import { DataState } from '../../components/DataState';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
@@ -79,6 +80,7 @@ export default function BookingsScreen() {
 
   const [bookings, setBookings] = useState<ConfirmedBooking[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [bookingsError, setBookingsError] = useState(false);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'refunds'>('upcoming');
 
   // Modals state
@@ -99,10 +101,13 @@ export default function BookingsScreen() {
       setBookings([]);
       return;
     }
+    setBookingsError(false);
     try {
       const items = await checkoutService.getBookings(user.email);
       setBookings(items);
     } catch (err) {
+      setBookingsError(true);
+      setBookings([]);
       console.warn('Error loading bookings:', err);
     }
   }, [user]);
@@ -326,6 +331,7 @@ export default function BookingsScreen() {
           />
         }
       >
+        {bookingsError && <DataState message="Unable to load bookings." onRetry={() => { void loadBookings(); }} />}
         {/* Policy Highlights Info Bar for Refunds tab */}
         {activeTab === 'refunds' && (
           <View style={styles.policyHighlightCard}>

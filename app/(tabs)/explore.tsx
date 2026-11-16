@@ -1,3 +1,4 @@
+import { DataState } from '../../components/DataState';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
@@ -54,7 +55,7 @@ export default function ExploreScreen() {
     }
   }, [params.q, params.category, params.area]);
 
-  const { data: offers, isLoading, isRefetching, refetch } = useQuery<Offer[]>({
+  const { data: offers, isLoading, isRefetching, isError, refetch } = useQuery<Offer[]>({
     queryKey: ['offers'],
     queryFn: () => catalogService.getOffers(),
   });
@@ -66,8 +67,7 @@ export default function ExploreScreen() {
       const a = (o.street_address || o.venue || '')
         .replace(/,\s*Lagos/gi, '')
         .replace(/Lagos/gi, '')
-        .replace(/[\s•\-–—]*demo\b/gi, '')
-        .trim();
+          .trim();
       if (a) {
         const primary = a.split(',')[0].trim();
         if (primary) set.add(primary);
@@ -178,7 +178,7 @@ export default function ExploreScreen() {
           </View>
         }
         ListEmptyComponent={
-          isLoading ? (
+          isError ? <DataState message="Unable to load data. Check your connection and try again." onRetry={() => { void refetch(); }} /> : isLoading ? (
             <View style={styles.centered}>
               <ActivityIndicator size="large" color={Palette.mulberry} />
             </View>
