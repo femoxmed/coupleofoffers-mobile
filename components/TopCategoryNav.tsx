@@ -51,16 +51,17 @@ export const WEB_HOMEPAGE_CATEGORIES: TopCategory[] = [
 interface TopCategoryNavProps {
   selected?: string;
   onSelect: (category: TopCategory) => void;
+  categories?: TopCategory[];
 }
 
-export function TopCategoryNav({ selected, onSelect }: TopCategoryNavProps) {
+export function TopCategoryNav({ selected, onSelect, categories = WEB_HOMEPAGE_CATEGORIES }: TopCategoryNavProps) {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.container}
     >
-      {WEB_HOMEPAGE_CATEGORIES.map((cat) => {
+      {categories.map((cat) => {
         const isSelected = Boolean(selected && selected === cat.id);
         const Icon = cat.icon;
 

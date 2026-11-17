@@ -22,8 +22,8 @@ interface TabItemConfig {
 
 const TAB_CONFIGS: TabItemConfig[] = [
   { name: 'index', label: 'Home', icon: House },
-  { name: 'explore', label: 'Explore', icon: Compass },
   { name: 'partners', label: 'Venues', icon: Store },
+  { name: 'explore', label: 'Explore', icon: Compass },
   { name: 'bookings', label: 'Bookings', icon: CalendarCheck },
   { name: 'profile', label: 'Account', icon: User, showDot: true },
 ];
@@ -98,7 +98,7 @@ export function WhatsAppTabBar({ state, descriptors, navigation }: any) {
             <TouchableOpacity
               key={tab.name}
               onPress={onPress}
-              style={styles.tabButton}
+              style={[styles.tabButton, tab.name === 'explore' && styles.exploreTabButton]}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
@@ -110,12 +110,14 @@ export function WhatsAppTabBar({ state, descriptors, navigation }: any) {
                   style={[
                     styles.iconWrap,
                     isFocused && styles.activeIconWrap,
+                    tab.name === 'explore' && styles.exploreIconWrap,
+                    tab.name === 'explore' && isFocused && styles.activeExploreIconWrap,
                   ]}
                 >
                   <Icon
-                    size={20}
+                    size={tab.name === 'explore' ? 25 : 20}
                     color={isFocused ? Palette.aubergine : Palette.mutedText}
-                    strokeWidth={isFocused ? 2.5 : 2.0}
+                    strokeWidth={tab.name === 'explore' || isFocused ? 2.5 : 2.0}
                   />
 
                   {/* Badges only when authenticated */}
@@ -135,6 +137,7 @@ export function WhatsAppTabBar({ state, descriptors, navigation }: any) {
                   style={[
                     styles.tabLabel,
                     isFocused ? styles.activeTabLabel : styles.inactiveTabLabel,
+                    tab.name === 'explore' && styles.exploreTabLabel,
                   ]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -182,6 +185,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: '100%',
   },
+  exploreTabButton: {
+    zIndex: 2,
+  },
   tabInner: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -197,6 +203,30 @@ const styles = StyleSheet.create({
   },
   activeIconWrap: {
     backgroundColor: Palette.secondaryBg, // #EFE3E7 brand capsule wash
+  },
+  exploreIconWrap: {
+    width: 58,
+    height: 58,
+    marginTop: -28,
+    borderRadius: 29,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderWidth: 2,
+    borderColor: '#D9C5D1',
+    shadowColor: Palette.aubergine,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  activeExploreIconWrap: {
+    backgroundColor: Palette.secondaryBg,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  exploreTabLabel: {
+    marginTop: 2,
+    color: Palette.aubergine,
+    fontWeight: '800',
   },
   tabLabel: {
     fontSize: 10.5,

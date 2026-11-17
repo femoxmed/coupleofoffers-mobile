@@ -3,9 +3,13 @@ import { resolveImageUrl } from '../constants/config';
 import type { Offer, Partner, HomepageSlide, SavedOffer, Slot } from '../types';
 
 export type PartnerDetail = Partner & { packages: Offer[]; gallery: string[] };
+export type CatalogCategory = { id: string; slug: string; name: string; position: number; active: boolean };
 type ApiSlot = Slot & { available?: number; booking_closes_at?: string };
 
 export const catalogService = {
+  async getCategories(): Promise<CatalogCategory[]> {
+    return apiClient<CatalogCategory[]>('/api/v1/categories');
+  },
   async getOffers(): Promise<Offer[]> {
     const data = await apiClient<Offer[]>('/api/v1/offers');
     return data.map(offer => ({ ...offer, image_url: offer.image_url ? resolveImageUrl(offer.image_url) : null }));

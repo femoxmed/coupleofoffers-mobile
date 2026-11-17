@@ -38,7 +38,7 @@ import { resolveImageSource } from '../../constants/images';
 import { Config, formatNaira } from '../../constants/config';
 import { BrandLogo } from '../../components/BrandLogo';
 import { HeroCarousel } from '../../components/HeroCarousel';
-import { TopCategoryNav } from '../../components/TopCategoryNav';
+import { TopCategoryNav, WEB_HOMEPAGE_CATEGORIES } from '../../components/TopCategoryNav';
 import { PartnerCard } from '../../components/PartnerCard';
 import { OfferCard } from '../../components/OfferCard';
 import {
@@ -78,6 +78,20 @@ export default function HomeScreen() {
     queryKey: ['homepage-slides'],
     queryFn: () => catalogService.getHomepageSlides(),
   });
+
+  const { data: apiCategories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => catalogService.getCategories(),
+  });
+  const categories = useMemo(() => {
+    if (!apiCategories?.length) return WEB_HOMEPAGE_CATEGORIES;
+    return apiCategories.map((item) => ({
+      id: item.slug,
+      name: item.name,
+      image: WEB_HOMEPAGE_CATEGORIES.find((category) => category.id === item.slug)?.image || '/images/terrace-evening.jpg',
+      icon: WEB_HOMEPAGE_CATEGORIES.find((category) => category.id === item.slug)?.icon || WEB_HOMEPAGE_CATEGORIES[0].icon,
+    }));
+  }, [apiCategories]);
 
   // 2. Fetch Featured Partners
   const { data: partners, isLoading: partnersLoading, isError: partnersError, refetch: refetchPartners } = useQuery<Partner[]>({
@@ -261,6 +275,7 @@ export default function HomeScreen() {
 
         {/* 3. Categories Nav (Matching Web App Homepage - with category image & icon) */}
         <TopCategoryNav
+          categories={categories}
           onSelect={(cat) => {
             router.push({
               pathname: '/(tabs)/explore',
@@ -401,7 +416,7 @@ export default function HomeScreen() {
                   <Text style={styles.categoryCardSubtitle} numberOfLines={2}>
                     {cat.sub}
                   </Text>
-                  <Text style={styles.categoryCardBrowse}>Browse experiences →</Text>
+                <Text style={styles.categoryCardBrowse}>Browse experiences →</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -1088,7 +1103,7 @@ const styles = StyleSheet.create({
   },
   categoryCardImage: {
     width: '100%',
-    height: 104,
+    height: 82,
     backgroundColor: Palette.secondaryBg,
   },
   categoryCardBody: {
@@ -1106,7 +1121,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   categoryCardBrowse: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: Palette.mulberry,
     fontWeight: '700',
     marginTop: 6,
@@ -1115,14 +1130,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 12,
     marginBottom: 4,
-    paddingVertical: 12,
+    paddingVertical: 15,
     borderRadius: 50,
     borderWidth: 1.5,
     borderColor: Palette.mulberry,
     alignItems: 'center',
   },
   browseAllBtnText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     color: Palette.mulberry,
   },
