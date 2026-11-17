@@ -161,7 +161,7 @@ export default function HomeScreen() {
       params: {
         q: searchQuery.trim() || undefined,
         category: filters.category !== 'all' ? filters.category : undefined,
-        area: filters.area !== 'all' && filters.area !== 'All Areas' ? filters.area : undefined,
+        area: filters.area !== 'all' && filters.area !== 'All Areas' && filters.area !== 'All Locations' ? filters.area : undefined,
         partySize: filters.partySize !== 'all' ? filters.partySize : undefined,
         priceRange: filters.priceRange !== 'all' ? filters.priceRange : undefined,
       },
@@ -175,7 +175,7 @@ export default function HomeScreen() {
       params: {
         q: searchQuery.trim() || undefined,
         category: newFilters.category !== 'all' ? newFilters.category : undefined,
-        area: newFilters.area !== 'all' && newFilters.area !== 'All Areas' ? newFilters.area : undefined,
+        area: newFilters.area !== 'all' && newFilters.area !== 'All Areas' && newFilters.area !== 'All Locations' ? newFilters.area : undefined,
         partySize: newFilters.partySize !== 'all' ? newFilters.partySize : undefined,
         priceRange: newFilters.priceRange !== 'all' ? newFilters.priceRange : undefined,
       },
@@ -187,6 +187,14 @@ export default function HomeScreen() {
     const list = offers || [];
     const featured = list.filter((o) => o.homepage_featured);
     return featured.length > 0 ? featured.slice(0, 4) : list.slice(0, 4);
+  }, [offers]);
+  const availableLocations = useMemo(() => {
+    const locations = new Set<string>();
+    (offers || []).forEach((offer) => {
+      const value = (offer.street_address || offer.venue || '').split(',')[0]?.trim();
+      if (value && !/demo/i.test(value)) locations.add(value);
+    });
+    return ['All Locations', ...Array.from(locations).sort()];
   }, [offers]);
 
   return (
@@ -256,6 +264,7 @@ export default function HomeScreen() {
         placeholder="Search experiences, venues, or areas..."
         filters={filters}
         onApplyFilters={handleApplyFilters}
+        availableAreas={availableLocations}
         showFilterChips={true}
       />
 

@@ -25,7 +25,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export interface FilterState {
   category: string;
   area: string;
-  partySize: string; // 'all' | '2' | 'group'
+  partySize: string; // 'all' | '1' | '2' | 'group'
   priceRange: string; // 'all' | 'under-50k' | '50k-100k' | '100k-200k' | 'above-200k'
 }
 
@@ -50,7 +50,8 @@ export const CATEGORY_OPTIONS = [
 ];
 
 export const PARTY_SIZE_OPTIONS = [
-  { id: 'all', label: 'Any Size' },
+  { id: 'all', label: 'Any group' },
+  { id: '1', label: 'Solo / 1 person' },
   { id: '2', label: 'Table for 2' },
   { id: 'group', label: 'Group (3+)' },
 ];
@@ -64,12 +65,7 @@ export const PRICE_RANGE_OPTIONS = [
 ];
 
 export const DEFAULT_AREAS = [
-  'All Areas',
-  'Victoria Island',
-  'Ikoyi',
-  'Lekki Phase 1',
-  'Ikeja GRA',
-  'Gbagada',
+  'All Locations',
 ];
 
 type ModalFilterType = 'category' | 'area' | 'budget' | 'party' | null;
@@ -99,7 +95,7 @@ export function ThemedSearchBar({
 }: ThemedSearchBarProps) {
   // Count active filters (excluding 'all')
   const activeCount = Object.entries(filters).filter(
-    ([_, val]) => val !== 'all' && val !== 'All Areas'
+    ([_, val]) => val !== 'all' && val !== 'All Areas' && val !== 'All Locations'
   ).length;
 
   // The pills only show when user clicks the filter icon (or if active filters already exist)
@@ -152,7 +148,7 @@ export function ThemedSearchBar({
   };
 
   const handleResetAll = () => {
-    const reset = { ...DEFAULT_FILTERS, area: 'All Areas' };
+    const reset = { ...DEFAULT_FILTERS, area: 'all' };
     onApplyFilters?.(reset);
   };
 
@@ -160,7 +156,7 @@ export function ThemedSearchBar({
   const categoryLabel =
     CATEGORY_OPTIONS.find((c) => c.id === filters.category)?.label || 'Category';
   const areaLabel =
-    filters.area !== 'all' && filters.area !== 'All Areas' ? filters.area : 'Area';
+    filters.area !== 'all' && filters.area !== 'All Areas' && filters.area !== 'All Locations' ? filters.area : 'Location';
   const partyLabel =
     PARTY_SIZE_OPTIONS.find((p) => p.id === filters.partySize)?.label || 'Party Size';
   const budgetLabel =
@@ -371,7 +367,7 @@ export function ThemedSearchBar({
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>
                 {activeModalType === 'category' && 'Category'}
-                {activeModalType === 'area' && 'Area / Neighborhood'}
+                {activeModalType === 'area' && 'Location'}
                 {activeModalType === 'budget' && 'Budget / Price Range'}
                 {activeModalType === 'party' && 'Party Size'}
               </Text>
