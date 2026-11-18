@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+    paddingBottom: 24,
     justifyContent: 'flex-end',
   },
   headline: {
