@@ -300,7 +300,9 @@ export default function HomeScreen() {
         {/* 2. Hero Editorial Carousel */}
         {slides && slides.length > 0 ? (
           <HeroCarousel
-            slides={slides}
+            slides={slides.map((slide) => slide.id === 'curated-experiences'
+              ? { ...slide, copy: 'Dinner, spa, games or something creative. Find a date experience made for you.' }
+              : slide)}
             onActionPress={() => router.push('/(tabs)/explore')}
           />
         ) : null}
