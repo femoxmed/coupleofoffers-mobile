@@ -63,7 +63,7 @@ export default function MobileBachsCheckoutScreen() {
 
   const amountKobo = Number(params.amountKobo) || 0;
   const partySize = Number(params.partySize) || 2;
-  const userEmail = (params.email || authUser?.email || 'guest@coupleofoffers.ng').trim();
+  const userEmail = (params.email || authUser?.email || 'guest@coupleofoffers.com').trim();
 
   // 5-minute hold timer
   useEffect(() => {
@@ -218,7 +218,7 @@ export default function MobileBachsCheckoutScreen() {
                 <View style={styles.qrContainer}>
                   <View style={styles.qrBox}>
                     <QRCode
-                      value={`https://coupleofoffers.ng/partner?code=${arrivalPin}&ref=${reference}`}
+                      value={`https://coupleofoffers.com/partner?code=${arrivalPin}&ref=${reference}`}
                       size={80}
                       bgColor="#FFFFFF"
                       fgColor={Palette.aubergine}

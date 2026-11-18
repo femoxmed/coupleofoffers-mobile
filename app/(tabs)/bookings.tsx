@@ -647,7 +647,7 @@ export default function BookingsScreen() {
                       <View style={styles.qrContainer}>
                         <View style={styles.qrBox}>
                           <QRCode
-                            value={`https://coupleofoffers.ng/partner?code=${selectedVoucher.arrivalPin}&ref=${selectedVoucher.reference}`}
+                            value={`https://coupleofoffers.com/partner?code=${selectedVoucher.arrivalPin}&ref=${selectedVoucher.reference}`}
                             size={82}
                             bgColor="#FFFFFF"
                             fgColor={Palette.aubergine}
@@ -1492,7 +1492,7 @@ function HelpDrawer({
     try {
       const res = await checkoutService.submitSupportTicket({
         name: userName || 'Customer',
-        email: userEmail || 'guest@coupleofoffers.ng',
+        email: userEmail || 'guest@coupleofoffers.com',
         topic,
         bookingReference: bookingRef,
         message,
@@ -1510,7 +1510,7 @@ function HelpDrawer({
       : 'Hi Couple Of Offers concierge, I have an inquiry regarding date experiences.';
     const url = `https://wa.me/2348000000000?text=${encodeURIComponent(text)}`;
     Linking.openURL(url).catch(() => {
-      Alert.alert('WhatsApp Unavailable', 'Please submit a ticket or email support@coupleofoffers.ng.');
+      Alert.alert('WhatsApp Unavailable', 'Please submit a ticket or email support@coupleofoffers.com.');
     });
   };
 
@@ -1518,7 +1518,7 @@ function HelpDrawer({
     const subject = bookingRef
       ? `Booking Assistance: ${bookingRef}`
       : 'Couple Of Offers Customer Inquiry';
-    Linking.openURL(`mailto:support@coupleofoffers.ng?subject=${encodeURIComponent(subject)}`);
+    Linking.openURL(`mailto:support@coupleofoffers.com?subject=${encodeURIComponent(subject)}`);
   };
 
   if (!isOpen) return null;

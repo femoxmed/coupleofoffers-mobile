@@ -307,8 +307,8 @@ export default function OfferDetailScreen() {
     if (!offer) return;
     const slug = encodeURIComponent(offer.slug || offer.id);
     const url = withPricing
-      ? `https://coupleofoffers.ng/offers/${slug}`
-      : `https://coupleofoffers.ng/share/offer/${slug}`;
+      ? `https://coupleofoffers.com/offers/${slug}`
+      : `https://coupleofoffers.com/share/offer/${slug}`;
     const description = withPricing
       ? 'Found something special for us? See the full experience, price, and availability.'
       : 'I found a date idea you’ll love. Explore the experience and venue.';
@@ -445,7 +445,7 @@ export default function OfferDetailScreen() {
       Alert.alert('Select arrival time', 'Choose a date and time first so the request contains the exact booking details.');
       return;
     }
-    const link = `https://coupleofoffers.ng/pay-for?offer=${encodeURIComponent(offer.slug || offer.id)}&slot=${encodeURIComponent(selectedSlot)}&date=${encodeURIComponent(selectedDate)}&guests=${partySize}`;
+    const link = `https://coupleofoffers.com/pay-for?offer=${encodeURIComponent(offer.slug || offer.id)}&slot=${encodeURIComponent(selectedSlot)}&date=${encodeURIComponent(selectedDate)}&guests=${partySize}`;
     try {
       await Share.share({ title: `Payment request for ${offer.title}`, message: `I found an experience I’d love to share with you. Could you help cover this booking? It includes the exact date, time, guest count, price and venue details:\n\n${link}` });
     } catch { /* dismissed */ }

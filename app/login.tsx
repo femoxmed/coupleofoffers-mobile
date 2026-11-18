@@ -110,7 +110,7 @@ export default function LoginScreen() {
               <Mail size={18} color={Palette.mutedText} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="you@coupleofoffers.ng"
+                placeholder="you@coupleofoffers.com"
                 placeholderTextColor={Palette.mutedText}
                 keyboardType="email-address"
                 autoCapitalize="none"

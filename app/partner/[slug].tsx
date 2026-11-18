@@ -55,7 +55,7 @@ export default function PartnerDetailScreen() {
     if (!partner) return;
     try {
       await Share.share({
-        message: `Check out date experiences at ${partner.name} on Couple Of Offers: https://coupleofoffers.ng/partners/${partner.slug}`,
+        message: `Check out date experiences at ${partner.name} on Couple Of Offers: https://coupleofoffers.com/partners/${partner.slug}`,
       });
     } catch {}
   };

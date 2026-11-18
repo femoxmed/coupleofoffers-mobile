@@ -114,7 +114,7 @@ export default function ProfileScreen() {
       onPress: () =>
         Alert.alert(
           'Concierge Desk',
-          'Need assistance with a booking or custom arrangement? Email concierge@coupleofoffers.ng.'
+          'Need assistance with a booking or custom arrangement? Email concierge@coupleofoffers.com.'
         ),
     },
   ];
