@@ -139,17 +139,17 @@ export function HeroCarousel({ slides, onActionPress }: HeroCarouselProps) {
                 <Text style={styles.accentText}>{item.accent}</Text>
               </Text>
 
-              <Text style={styles.copyText} numberOfLines={2}>
+              <Text style={styles.copyText} numberOfLines={3}>
                 {item.copy}
               </Text>
 
               {item.action ? (
                 <TouchableOpacity
-                  activeOpacity={0.88}
+                  activeOpacity={1}
                   onPress={() => onActionPress?.(item)}
                   style={styles.actionButton}
                 >
-                  <Text style={styles.actionButtonText}>{item.action}</Text>
+                  <Text style={styles.actionButtonText}>Explore Experiences</Text>
                   <ArrowRight size={13} color={Palette.aubergine} style={{ marginLeft: 5 }} />
                 </TouchableOpacity>
               ) : null}
