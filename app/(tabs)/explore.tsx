@@ -20,6 +20,7 @@ import {
   CATEGORY_OPTIONS,
 } from '../../components/ThemedSearchBar';
 import type { Offer } from '../../types';
+import { useSearchStore } from '../../store/useSearchStore';
 
 export default function ExploreScreen() {
   const params = useLocalSearchParams<{
@@ -30,7 +31,8 @@ export default function ExploreScreen() {
     priceRange?: string;
   }>();
 
-  const [searchQuery, setSearchQuery] = useState(params.q || '');
+  const searchQuery = useSearchStore((s) => s.query);
+  const setSearchQuery = useSearchStore((s) => s.setQuery);
   const [filters, setFilters] = useState<FilterState>({
     category: params.category || 'all',
     area: params.area || 'all',

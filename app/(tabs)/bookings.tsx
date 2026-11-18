@@ -83,6 +83,7 @@ export default function BookingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [bookingsError, setBookingsError] = useState(false);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'refunds' | 'unpaid'>('upcoming');
+  const [bookingFilter, setBookingFilter] = useState<'all' | 'self' | 'others'>('all');
 
   // Modals state
   const [selectedVoucher, setSelectedVoucher] = useState<ConfirmedBooking | null>(null);
@@ -194,12 +195,20 @@ export default function BookingsScreen() {
     };
   }, [bookings]);
 
-  const displayedList =
+  const tabList =
     activeTab === 'upcoming'
       ? upcomingBookings
       : activeTab === 'past'
       ? pastBookings
       : activeTab === 'refunds' ? refundBookings : [];
+  const displayedList = tabList.filter((booking) => {
+    if (bookingFilter === 'all') return true;
+    const payer = booking.payerEmail?.trim().toLowerCase();
+    const guest = booking.email?.trim().toLowerCase();
+    const current = user?.email?.trim().toLowerCase();
+    const isOther = Boolean(payer && current && payer !== current) || Boolean(payer && guest && payer !== guest);
+    return bookingFilter === 'others' ? isOther : !isOther;
+  });
 
   // 1. UNLOGGED IN: Prompt User to Sign In (Optically centered above floating nav)
   if (!user) {
@@ -341,6 +350,14 @@ export default function BookingsScreen() {
         </TouchableOpacity>
       </View>
 
+      {activeTab === 'upcoming' && <View style={styles.bookingFilterRow}>
+        {([['all', 'All bookings'], ['self', 'My bookings'], ['others', 'Paid for others']] as const).map(([value, label]) => (
+          <TouchableOpacity key={value} onPress={() => setBookingFilter(value)} style={[styles.bookingFilterChip, bookingFilter === value && styles.bookingFilterChipActive]}>
+            <Text style={[styles.bookingFilterText, bookingFilter === value && styles.bookingFilterTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>}
+
       {/* Scrollable Bookings List */}
       <BrandRefreshScrollView
         style={{ flex: 1 }}
@@ -421,6 +438,9 @@ export default function BookingsScreen() {
                   <MapPin size={13} color={Palette.mutedText} style={{ marginRight: 4 }} />
                   <Text style={styles.venueText}>{b.venueName}</Text>
                 </View>
+                {b.payerEmail && b.payerEmail.toLowerCase() !== b.email.toLowerCase() && (
+                  <Text style={styles.paidByText}>Paid by {b.payerName || b.payerEmail}</Text>
+                )}
 
                 {/* Arrival Code Banner */}
                 {!isRefund && (
@@ -1787,6 +1807,32 @@ const styles = StyleSheet.create({
     color: Palette.aubergine,
     fontWeight: '800',
   },
+  bookingFilterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  bookingFilterChip: {
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: Palette.card,
+  },
+  bookingFilterChipActive: {
+    backgroundColor: Palette.aubergine,
+    borderColor: Palette.aubergine,
+  },
+  bookingFilterText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.mutedText,
+  },
+  bookingFilterTextActive: {
+    color: Palette.porcelain,
+  },
   refundsBadge: {
     marginLeft: 6,
     backgroundColor: Palette.mulberry,
@@ -1880,6 +1926,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Palette.mutedText,
   },
+  paidByText: {
+    color: Palette.mulberry,
+    fontSize: 11.5,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
   arrivalPinBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1955,9 +2007,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
   },
   priceLabel: {
     fontSize: 10.5,
@@ -1972,6 +2022,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    width: '100%',
   },
   passBtn: {
     flexDirection: 'row',

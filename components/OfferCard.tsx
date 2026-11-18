@@ -75,7 +75,7 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
           >
             <Heart
               size={14}
-              color={saved ? Palette.saved : Palette.aubergine}
+              color={Palette.saved}
               fill={saved ? Palette.saved : 'transparent'}
             />
           </Pressable>
@@ -156,7 +156,7 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
           >
             <Heart
               size={16}
-              color={saved ? Palette.saved : Palette.aubergine}
+              color={Palette.saved}
               fill={saved ? Palette.saved : 'transparent'}
             />
           </Pressable>

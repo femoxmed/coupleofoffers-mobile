@@ -114,6 +114,7 @@ export default function RootLayout() {
             presentation: 'fullScreenModal',
           }}
         />
+        <Stack.Screen name="pay-for" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen
           name="partner/[slug]"
           options={{

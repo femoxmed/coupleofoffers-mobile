@@ -75,6 +75,7 @@ export default function OfferDetailScreen() {
   const [partyChoice, setPartyChoice] = useState<{ offerId: string; size: number } | null>(null);
   const [email, setEmail] = useState<string>(authUser?.email || '');
   const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
+  const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Web-parity dropdown and calendar picker states
@@ -298,15 +299,29 @@ export default function OfferDetailScreen() {
   const totalSavingsKobo = quote?.savingsKobo ?? 0;
   const discountPercent = quote?.discountPercent ?? 0;
 
-  const handleShare = async () => {
+  const handleShare = () => {
+    setIsShareModalVisible(true);
+  };
+
+  const shareExperience = async (withPricing: boolean) => {
     if (!offer) return;
+    const slug = encodeURIComponent(offer.slug || offer.id);
+    const url = withPricing
+      ? `https://coupleofoffers.ng/offers/${slug}`
+      : `https://coupleofoffers.ng/share/offer/${slug}`;
+    const description = withPricing
+      ? 'Found something special for us? See the full experience, price, and availability.'
+      : 'I found a date idea you’ll love. Explore the experience and venue.';
     try {
-      await Share.share({
-        message: `${offer.title} at ${cleanVenueName} - Curated upfront date experience on Couple Of Offers.`,
-        title: offer.title,
-      });
-    } catch {
-      // User dismissed
+      setIsShareModalVisible(false);
+      const title = withPricing ? `Book this experience: ${offer.title}` : `A date idea: ${offer.title}`;
+      const content = Platform.OS === 'ios'
+        ? { title, message: description, url }
+        : { title, message: `${description}\n\n${url}` };
+      await new Promise<void>(resolve => setTimeout(resolve, 300));
+      await Share.share(content);
+    } catch (error) {
+      Alert.alert('Unable to share', error instanceof Error ? error.message : 'Please try again.');
     }
   };
 
@@ -415,6 +430,27 @@ export default function OfferDetailScreen() {
     }
   };
 
+  const handlePayForMe = () => {
+    if (!offer || !selectedDate || !selectedSlot) {
+      Alert.alert('Select arrival time', 'Please choose an arrival date and time first.');
+      return;
+    }
+    const slotObj = allSlots.find(s => s.id === selectedSlot);
+    router.push({ pathname: '/pay-for', params: { offerId: offer.id, slotId: selectedSlot, partySize: String(partySize), amountKobo: String(calculatedTotalKobo), offerTitle: offer.title, venueName: cleanVenueName, slotTime: slotObj?.starts_at || '' } });
+    setIsBookingModalVisible(false);
+  };
+
+  const handleAskSomeoneToPay = async () => {
+    if (!offer || !selectedDate || !selectedSlot) {
+      Alert.alert('Select arrival time', 'Choose a date and time first so the request contains the exact booking details.');
+      return;
+    }
+    const link = `https://coupleofoffers.ng/pay-for?offer=${encodeURIComponent(offer.slug || offer.id)}&slot=${encodeURIComponent(selectedSlot)}&date=${encodeURIComponent(selectedDate)}&guests=${partySize}`;
+    try {
+      await Share.share({ title: `Payment request for ${offer.title}`, message: `I found an experience I’d love to share with you. Could you help cover this booking? It includes the exact date, time, guest count, price and venue details:\n\n${link}` });
+    } catch { /* dismissed */ }
+  };
+
   if (!isLoading && !offer) {
     return <DataState message="Unable to load this offer." onRetry={() => { void refetch(); }} />;
   }
@@ -461,7 +497,7 @@ export default function OfferDetailScreen() {
           <View style={styles.floatingControls}>
             <View style={styles.rightIcons}>
               <TouchableOpacity
-                onPress={handleShare}
+                onPress={() => setIsShareModalVisible(true)}
                 style={styles.iconCircle}
                 activeOpacity={0.8}
               >
@@ -474,8 +510,8 @@ export default function OfferDetailScreen() {
               >
                 <Heart
                   size={18}
-                  color={saved ? '#E11D48' : Palette.aubergine}
-                  fill={saved ? '#E11D48' : 'transparent'}
+                  color={Palette.saved}
+                  fill={saved ? Palette.saved : 'transparent'}
                 />
               </TouchableOpacity>
             </View>
@@ -522,6 +558,8 @@ export default function OfferDetailScreen() {
               }
             }}
             activeOpacity={0.75}
+            accessibilityRole="link"
+            accessibilityLabel={`View ${cleanVenueName} restaurant page`}
           >
             <MapPin size={15} color={Palette.mulberry} style={{ marginRight: 6 }} />
             <Text style={styles.venueNameText}>{cleanVenueName}</Text>
@@ -529,7 +567,6 @@ export default function OfferDetailScreen() {
               <Text style={styles.venueAreaText}> • {cleanAddress}</Text>
             ) : null}
           </TouchableOpacity>
-
           {/* Price & Savings Highlight Header Block */}
           <View style={styles.priceHighlightCard}>
             <View style={styles.priceHighlightRow}>
@@ -660,33 +697,25 @@ export default function OfferDetailScreen() {
             </View>
           </View>
 
-          {/* Getting There & Location */}
-          <Text style={styles.sectionHeading}>Getting There</Text>
-          <View style={styles.locationCard}>
-            <View style={styles.locationHeader}>
-              <MapPin size={18} color={Palette.mulberry} style={{ marginRight: 8 }} />
-              <Text style={styles.locationTitle}>{cleanVenueName}</Text>
-            </View>
-            {cleanAddress ? (
-              <Text style={styles.locationAddress}>{cleanAddress}</Text>
-            ) : null}
-
-            {offer.arrival_notes ? (
-              <View style={styles.notesRow}>
-                <Info size={14} color={Palette.goldInk} style={{ marginRight: 6, marginTop: 2 }} />
-                <Text style={styles.notesText}>{offer.arrival_notes}</Text>
+          <View style={styles.venuePreviewCard}>
+            <View style={styles.venuePreviewBody}>
+              <CatalogImage url={offer.venue_banner_url || offer.image_url} category={offer.category} style={styles.venuePreviewImage} iconSize={24} />
+              <View style={styles.venuePreviewCopy}>
+                <Text style={styles.venuePreviewEyebrow}>ABOUT THE RESTAURANT</Text>
+                <Text style={styles.venuePreviewName} numberOfLines={1}>{cleanVenueName}</Text>
+                <Text style={styles.venuePreviewAddress} numberOfLines={2}>{cleanAddress || 'Verified Couple Of Offers partner venue'}</Text>
               </View>
-            ) : null}
-
-            <TouchableOpacity
-              onPress={handleOpenDirections}
-              style={styles.directionsBtn}
-              activeOpacity={0.8}
-            >
-              <Navigation size={14} color={Palette.aubergine} style={{ marginRight: 6 }} />
-              <Text style={styles.directionsBtnText}>Get Directions on Maps</Text>
-            </TouchableOpacity>
+            </View>
+            {offer.arrival_notes ? <Text style={styles.venuePreviewNotes}>{offer.arrival_notes}</Text> : null}
+            <View style={styles.venuePreviewActions}>
+              <TouchableOpacity style={styles.venuePreviewLink} onPress={() => offer.venue_slug && router.push(`/partner/${offer.venue_slug}` as any)} activeOpacity={0.8}>
+                <Text style={styles.venuePreviewLinkText}>Learn more about this restaurant</Text><ChevronRight size={16} color={Palette.mulberry} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.venueDirectionsLink} onPress={handleOpenDirections} activeOpacity={0.8}><Navigation size={14} color={Palette.mulberry}/><Text style={styles.venuePreviewLinkText}>Directions</Text></TouchableOpacity>
+            </View>
           </View>
+
+          {/* Getting There & Location */}
 
           {/* Upfront Guarantee Notice */}
           <View style={styles.guaranteeBox}>
@@ -738,6 +767,24 @@ export default function OfferDetailScreen() {
           <ArrowRight size={16} color={Palette.porcelain} style={{ marginLeft: 6 }} />
         </TouchableOpacity>
       </View>
+
+      <Modal visible={isShareModalVisible} transparent animationType="fade" onRequestClose={() => setIsShareModalVisible(false)}>
+        <View style={styles.shareOverlay}>
+          <View style={styles.shareSheet}>
+            <Text style={styles.shareEyebrow}>SHARE A DATE IDEA</Text>
+            <Text style={styles.shareTitle}>How would you like to share it?</Text>
+            <TouchableOpacity style={styles.shareOption} onPress={() => { void shareExperience(true); }}>
+              <Share2 size={20} color={Palette.mulberry} />
+              <View style={styles.shareOptionCopy}><Text style={styles.shareOptionTitle}>Share with pricing</Text><Text style={styles.shareOptionDescription}>Found something special for us? See the full experience, price, and availability.</Text></View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.shareOption} onPress={() => { void shareExperience(false); }}>
+              <Share2 size={20} color={Palette.mulberry} />
+              <View style={styles.shareOptionCopy}><Text style={styles.shareOptionTitle}>Share without pricing</Text><Text style={styles.shareOptionDescription}>I found a date idea you’ll love. Explore the experience and venue.</Text></View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.shareCancel} onPress={() => setIsShareModalVisible(false)}><Text style={styles.shareCancelText}>Cancel</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* ========================================================= */}
       {/* BOOKING MODAL (Web Parity: Dropdown Branch & Time, Calendar, Fixed Nav) */}
@@ -1221,6 +1268,14 @@ export default function OfferDetailScreen() {
                 { paddingBottom: Math.max(insets.bottom, 14) },
               ]}
             >
+              <View style={styles.paymentChoiceLinks}>
+                <TouchableOpacity onPress={handleAskSomeoneToPay} activeOpacity={0.8}>
+                  <Text style={styles.payForMeButtonText}>Ask someone to pay for me</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handlePayForMe} activeOpacity={0.8}>
+                  <Text style={styles.payForMeButtonText}>Pay for someone</Text>
+                </TouchableOpacity>
+              </View>
               <View style={styles.modalFixedPriceCol}>
                 <View style={styles.bottomPriceRow}>
                   <Text style={styles.modalFixedPrice}>
@@ -1274,6 +1329,16 @@ export default function OfferDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  shareOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(48,29,50,0.42)', padding: 18 },
+  shareSheet: { width: '100%', maxWidth: 430, backgroundColor: Palette.porcelain, borderRadius: 22, padding: 18, paddingBottom: 12 },
+  shareEyebrow: { color: Palette.mulberry, fontSize: 11, fontWeight: '800', letterSpacing: 1.4, marginBottom: 7 },
+  shareTitle: { color: Palette.aubergine, fontSize: 22, fontWeight: '800', marginBottom: 12 },
+  shareOption: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Palette.secondaryBg, borderRadius: 15, padding: 12, marginBottom: 8 },
+  shareOptionCopy: { flex: 1 },
+  shareOptionTitle: { color: Palette.aubergine, fontSize: 15, fontWeight: '800', marginBottom: 3 },
+  shareOptionDescription: { color: Palette.mutedText, fontSize: 11.5, lineHeight: 16 },
+  shareCancel: { alignItems: 'center', paddingVertical: 8 },
+  shareCancelText: { color: Palette.mulberry, fontSize: 15, fontWeight: '800' },
   container: {
     flex: 1,
     backgroundColor: Palette.porcelain,
@@ -1536,6 +1601,25 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  venuePreviewCard: {
+    marginTop: 16,
+    overflow: 'hidden',
+    backgroundColor: Palette.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Palette.border,
+  },
+  venuePreviewBody: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  venuePreviewImage: { width: 58, height: 58, borderRadius: 12, backgroundColor: Palette.secondaryBg },
+  venuePreviewCopy: { flex: 1, minWidth: 0 },
+  venuePreviewEyebrow: { fontSize: 9, letterSpacing: 1, fontWeight: '800', color: Palette.mulberry },
+  venuePreviewName: { marginTop: 3, fontSize: 17, fontWeight: '800', color: Palette.aubergine },
+  venuePreviewAddress: { marginTop: 3, fontSize: 12, color: Palette.mutedText },
+  venuePreviewLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, backgroundColor: Palette.secondaryBg, borderTopWidth: 1, borderTopColor: Palette.border },
+  venuePreviewLinkText: { fontSize: 12, fontWeight: '800', color: Palette.mulberry },
+  venuePreviewNotes: { paddingHorizontal: 14, paddingBottom: 12, fontSize: 12, lineHeight: 18, color: Palette.mutedText },
+  venuePreviewActions: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: Palette.border, backgroundColor: Palette.secondaryBg },
+  venueDirectionsLink: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 12, borderLeftWidth: 1, borderLeftColor: Palette.border },
   inclusionItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -2085,6 +2169,26 @@ const styles = StyleSheet.create({
     color: Palette.aubergine,
     fontWeight: '600',
   },
+  payForMeButton: {
+    position: 'absolute',
+    left: 20,
+    top: -42,
+    zIndex: 2,
+    paddingVertical: 8,
+  },
+  payForMeButtonText: {
+    color: Palette.mulberry,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  paymentChoiceLinks: {
+    position: 'absolute',
+    left: 20,
+    top: -48,
+    zIndex: 2,
+    flexDirection: 'row',
+    gap: 18,
+  },
   inputHelperText: {
     fontSize: 11,
     color: Palette.mutedText,
@@ -2179,6 +2283,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 8,
+    position: 'relative',
   },
   modalFixedPriceCol: {
     flex: 1,

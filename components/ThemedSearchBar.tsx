@@ -179,6 +179,9 @@ export function ThemedSearchBar({
           returnKeyType="search"
           onSubmitEditing={onSubmit}
           clearButtonMode="never"
+          autoCorrect={false}
+          spellCheck={false}
+          autoCapitalize="none"
         />
 
         {value.trim().length > 0 ? (
@@ -187,7 +190,7 @@ export function ThemedSearchBar({
             style={styles.clearBtn}
             activeOpacity={0.7}
           >
-            <X size={15} color={Palette.mutedText} />
+            <X size={18} color={Palette.porcelain} strokeWidth={2.5} />
           </TouchableOpacity>
         ) : null}
 
@@ -568,8 +571,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   clearBtn: {
-    padding: 6,
-    marginRight: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Palette.mulberry,
   },
   filterBtn: {
     width: 34,

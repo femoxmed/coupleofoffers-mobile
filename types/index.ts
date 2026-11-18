@@ -25,6 +25,7 @@ export type Offer = {
   venue_id?: string;
   venue_name: string;
   venue_slug?: string;
+  venue_banner_url?: string | null;
   street_address?: string | null;
   arrival_notes?: string | null;
   days_available?: string | null;

@@ -110,14 +110,12 @@ export function WhatsAppTabBar({ state, descriptors, navigation }: any) {
                   style={[
                     styles.iconWrap,
                     isFocused && styles.activeIconWrap,
-                    tab.name === 'explore' && styles.exploreIconWrap,
-                    tab.name === 'explore' && isFocused && styles.activeExploreIconWrap,
                   ]}
                 >
                   <Icon
-                    size={tab.name === 'explore' ? 25 : 20}
-                    color={isFocused ? Palette.aubergine : Palette.mutedText}
-                    strokeWidth={tab.name === 'explore' || isFocused ? 2.5 : 2.0}
+                    size={24}
+                    color={Palette.aubergine}
+                    strokeWidth={isFocused ? 2.5 : 2.2}
                   />
 
                   {/* Badges only when authenticated */}
@@ -137,7 +135,6 @@ export function WhatsAppTabBar({ state, descriptors, navigation }: any) {
                   style={[
                     styles.tabLabel,
                     isFocused ? styles.activeTabLabel : styles.inactiveTabLabel,
-                    tab.name === 'explore' && styles.exploreTabLabel,
                   ]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -191,37 +188,40 @@ const styles = StyleSheet.create({
   tabInner: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 6,
   },
   iconWrap: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
+    width: 60,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'transparent',
+  },
+  activeIconWrap: {
+    backgroundColor: Palette.secondaryBg, // #EFE3E7 brand capsule wash
+    marginTop: 4,
+  },
+  exploreIconWrap: {
     width: 56,
     height: 32,
     borderRadius: 16,
     backgroundColor: 'transparent',
   },
-  activeIconWrap: {
-    backgroundColor: Palette.secondaryBg, // #EFE3E7 brand capsule wash
-  },
-  exploreIconWrap: {
+  activeExploreIconWrap: {
     width: 58,
     height: 58,
     marginTop: -28,
     borderRadius: 29,
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    backgroundColor: Palette.secondaryBg,
     borderWidth: 2,
-    borderColor: '#D9C5D1',
+    borderColor: '#FFFFFF',
     shadowColor: Palette.aubergine,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 5,
     elevation: 3,
-  },
-  activeExploreIconWrap: {
-    backgroundColor: Palette.secondaryBg,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
   },
   exploreTabLabel: {
     marginTop: 2,
@@ -229,8 +229,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   tabLabel: {
-    fontSize: 10.5,
-    marginTop: 3,
+    fontSize: 13,
+    marginTop: 0,
     letterSpacing: -0.2,
   },
   activeTabLabel: {
@@ -238,7 +238,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   inactiveTabLabel: {
-    color: Palette.mutedText, // #695A63 brand muted slate/plum
+    color: Palette.aubergine,
+    opacity: 0.9,
     fontWeight: '600',
   },
   dotBadge: {

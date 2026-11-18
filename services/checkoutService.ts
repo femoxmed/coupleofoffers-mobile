@@ -11,6 +11,10 @@ export interface CheckoutInitParams {
   venueName?: string;
   venueAddress?: string;
   slotTime?: string;
+  payerEmail?: string;
+  payerName?: string;
+  payeeName?: string;
+  beneficiaryPhone?: string;
 }
 
 export interface CheckoutInitResponse {
@@ -45,6 +49,9 @@ export interface ConfirmedBooking {
   canResume?: boolean;
   refundReason?: string;
   refundEligibleAuto?: boolean;
+  payerEmail?: string | null;
+  payerName?: string | null;
+  payeeName?: string | null;
 }
 
 export interface RescheduleSlotItem {
@@ -75,7 +82,7 @@ export const checkoutService = {
     });
     const data = await apiClient<CheckoutInitResponse>(`/api/v1/offers/${params.offerId}/checkout`, {
       method: 'POST',
-      body: JSON.stringify({ requestId, slotId: params.slotId, partySize: params.partySize, expectedTotalKobo: params.totalKobo, email: params.email }),
+      body: JSON.stringify({ requestId, slotId: params.slotId, partySize: params.partySize, expectedTotalKobo: params.totalKobo, email: params.email, payerEmail: params.payerEmail, payerName: params.payerName, payeeName: params.payeeName, beneficiaryPhone: params.beneficiaryPhone }),
     });
     return data;
   },
@@ -110,12 +117,9 @@ export const checkoutService = {
       // Attempt to fetch from server if authenticated
       const serverItems = await apiClient<any[]>('/api/v1/account/bookings', { timeoutMs: 3500 });
       if (Array.isArray(serverItems)) {
-        // Filter strictly by the current user's email if provided
-        const filteredServer = normUserEmail
-          ? serverItems.filter(
-              (item) => !item.guest_email || item.guest_email.trim().toLowerCase() === normUserEmail
-            )
-          : serverItems;
+        // The API already scopes results to the authenticated account as guest or payer.
+        // Do not filter by guest_email here: gift bookings belong to the payer too.
+        const filteredServer = serverItems;
 
         const mappedServer: ConfirmedBooking[] = filteredServer.map((item) => {
           let slotFormatted = 'Reserved Slot';
@@ -148,6 +152,9 @@ export const checkoutService = {
             canResume: item.can_resume,
             status: item.status || 'pending',
             refundReason: item.review_reason,
+            payerEmail: item.payer_email || null,
+            payerName: item.payer_name || null,
+            payeeName: item.payee_name || null,
           };
         });
 

@@ -48,7 +48,14 @@ import {
 } from '../../components/ThemedSearchBar';
 import { useLocationStore} from '../../store/useLocationStore';
 import { LocationPickerModal } from '../../components/LocationPickerModal';
+import { useSearchStore } from '../../store/useSearchStore';
 import type { Offer, Partner, HomepageSlide } from '../../types';
+
+function searchGuestLabel(offer: Offer) {
+  const guests = offer.party_size || 1;
+  const hasExtraGuests = (offer.max_party_size || 0) > guests || (offer.extra_friend_price_kobo || 0) > 0;
+  return hasExtraGuests ? `from ${guests} guests` : `for ${guests} guests`;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -56,7 +63,9 @@ export default function HomeScreen() {
   const { savedOffers, toggleSave, fetchSaved } = useSavedStore();
   const savedCount = savedOffers.length;
   const { currentLocation, initLocation } = useLocationStore();
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchQuery = useSearchStore((s) => s.query);
+  const setSearchQuery = useSearchStore((s) => s.setQuery);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
@@ -197,6 +206,12 @@ export default function HomeScreen() {
     return ['All Locations', ...Array.from(locations).sort()];
   }, [offers]);
 
+  const searchSuggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q || !offers) return [];
+    return offers.filter((offer) => [offer.title, offer.venue_name, offer.venue, offer.category, offer.street_address].filter(Boolean).some(value => String(value).toLowerCase().includes(q))).slice(0, 4);
+  }, [offers, searchQuery]);
+
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top']}>
       {/* 1. Official Web App Masthead with Slogan & Top Right Location */}
@@ -257,16 +272,24 @@ export default function HomeScreen() {
       </View>
 
       {/* Fixed Search Bar - always visible above scroll content */}
-      <ThemedSearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        onSubmit={handleSearchSubmit}
-        placeholder="Search experiences, venues, or areas..."
-        filters={filters}
-        onApplyFilters={handleApplyFilters}
-        availableAreas={availableLocations}
-        showFilterChips={true}
-      />
+      <View style={styles.searchWithSuggestions}>
+        <ThemedSearchBar
+          value={searchQuery}
+          onChangeText={(value) => { setSearchQuery(value); setSearchFocused(true); }}
+          onSubmit={handleSearchSubmit}
+          placeholder="Search experiences, venues, or areas..."
+          filters={filters}
+          onApplyFilters={handleApplyFilters}
+          availableAreas={availableLocations}
+          showFilterChips={true}
+        />
+        {searchFocused && searchQuery.trim() && (
+          <View style={styles.searchSuggestions}>
+            {searchSuggestions.map((offer) => <TouchableOpacity key={offer.id} style={styles.searchSuggestion} onPress={() => { setSearchFocused(false); router.push(`/offer/${offer.id}`); }}><CatalogImage url={offer.image_url} category={offer.category} style={styles.searchSuggestionImage} iconSize={18} /><View style={styles.searchSuggestionCopy}><Text style={styles.searchSuggestionTitle} numberOfLines={1}>{offer.title}</Text><Text style={styles.searchSuggestionMeta} numberOfLines={1}>{offer.venue_name || offer.venue}</Text><Text style={styles.searchSuggestionGuests}>{searchGuestLabel(offer)}</Text></View><View style={styles.searchSuggestionPriceWrap}>{(offer.regular_price_kobo || 0) > offer.price_kobo && <Text style={styles.searchSuggestionWalkIn}>{formatNaira(offer.regular_price_kobo || 0)}</Text>}<Text style={styles.searchSuggestionPrice}>{formatNaira(offer.price_kobo)}</Text>{(offer.regular_price_kobo || 0) > offer.price_kobo && <Text style={styles.searchSuggestionSaved}>Save {formatNaira((offer.regular_price_kobo || 0) - offer.price_kobo)}</Text>}</View></TouchableOpacity>)}
+            <TouchableOpacity style={styles.seeAllSearch} onPress={() => { setSearchFocused(false); if (!searchSuggestions.length) setSearchQuery(''); router.push('/(tabs)/explore'); }}><Text style={styles.seeAllSearchText}>{searchSuggestions.length ? 'See all experiences' : '0 results found · See all experiences'}</Text><ChevronRight size={17} color={Palette.mulberry} /></TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       <BrandRefreshScrollView
         showsVerticalScrollIndicator={false}
@@ -858,6 +881,20 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  searchWithSuggestions: { zIndex: 20 },
+  searchSuggestions: { marginHorizontal: 16, marginTop: 6, backgroundColor: Palette.card, borderRadius: 16, borderWidth: 1, borderColor: Palette.border, padding: 8, shadowColor: Palette.aubergine, shadowOpacity: 0.12, shadowRadius: 10, elevation: 5 },
+  searchSuggestion: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: Palette.border },
+  searchSuggestionImage: { width: 44, height: 44, borderRadius: 10, marginRight: 10 },
+  searchSuggestionCopy: { flex: 1, marginRight: 8 },
+  searchSuggestionTitle: { color: Palette.aubergine, fontSize: 14, fontWeight: '800' },
+  searchSuggestionMeta: { color: Palette.mutedText, fontSize: 11, marginTop: 2 },
+  searchSuggestionGuests: { color: Palette.mutedText, fontSize: 10, marginTop: 2, fontWeight: '600' },
+  searchSuggestionPrice: { color: Palette.mulberry, fontSize: 12, fontWeight: '800' },
+  searchSuggestionWalkIn: { color: Palette.mutedText, fontSize: 10, textDecorationLine: 'line-through' },
+  searchSuggestionPriceWrap: { alignItems: 'flex-end' },
+  searchSuggestionSaved: { color: Palette.mulberry, fontSize: 10, fontWeight: '700', marginTop: 2 },
+  seeAllSearch: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 4 },
+  seeAllSearchText: { color: Palette.mulberry, fontSize: 13, fontWeight: '800' },
   safeContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
