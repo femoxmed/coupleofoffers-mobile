@@ -300,9 +300,31 @@ export default function HomeScreen() {
         {/* 2. Hero Editorial Carousel */}
         {slides && slides.length > 0 ? (
           <HeroCarousel
-            slides={slides.map((slide) => slide.id === 'curated-experiences'
-              ? { ...slide, copy: 'Dinner, spa, games or something creative. Find a date experience made for you.' }
-              : slide)}
+            slides={[
+              slides[0],
+              {
+                ...(slides.find((slide) => slide.id === 'curated-experiences') || slides[1]),
+                id: 'curated-experiences',
+                label: 'Curated experiences',
+                headline: 'A couple of ways',
+                accent: 'to spend the day.',
+                copy: 'Dinner, spa, games or something creative. Find a date experience made for you.',
+                href: '/explore',
+                action: 'Explore experiences',
+                image: '/images/curated-experiences-couples.webp',
+              },
+              {
+                ...(slides.find((slide) => slide.id === 'friends') || slides[2] || slides[0]),
+                id: 'friends',
+                label: 'Time together',
+                headline: 'Make time',
+                accent: 'for your people.',
+                copy: 'Catch up over good food, share a laugh and find something everyone will enjoy.',
+                href: '/explore?group=true',
+                action: 'Explore group offers',
+                image: '/images/group-friends-dining.jpg',
+              },
+            ]}
             onActionPress={() => router.push('/(tabs)/explore')}
           />
         ) : null}
