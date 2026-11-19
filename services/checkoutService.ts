@@ -25,6 +25,11 @@ export interface OfferEnquiryParams {
   message: string;
 }
 
+export interface PaymentRequestResult {
+  token: string;
+  expires_at: string;
+}
+
 export interface CheckoutInitResponse {
   authorizationUrl: string;
   reference: string;
@@ -60,6 +65,8 @@ export interface ConfirmedBooking {
   payerEmail?: string | null;
   payerName?: string | null;
   payeeName?: string | null;
+  isGuest?: boolean;
+  isPayer?: boolean;
 }
 
 export interface RescheduleSlotItem {
@@ -78,6 +85,13 @@ function getUserStorageKey(email?: string | null): string {
 }
 
 export const checkoutService = {
+  async createPaymentRequest(params: { offerId: string; slotId: string; partySize: number }): Promise<PaymentRequestResult> {
+    return apiClient<PaymentRequestResult>(`/api/v1/offers/${encodeURIComponent(params.offerId)}/payment-requests`, {
+      method: 'POST',
+      body: JSON.stringify({ slotId: params.slotId, partySize: params.partySize }),
+    });
+  },
+
   /** Start checkout through the API, which validates price and reserves real inventory. */
   async initBachsCheckout(params: CheckoutInitParams): Promise<CheckoutInitResponse> {
     if (!params.offerId || !params.slotId || !params.email || !Number.isInteger(params.totalKobo) || params.totalKobo <= 0) {
@@ -170,6 +184,8 @@ export const checkoutService = {
             payerEmail: item.payer_email || null,
             payerName: item.payer_name || null,
             payeeName: item.payee_name || null,
+            isGuest: item.is_guest === true,
+            isPayer: item.is_payer === true,
           };
         });
 

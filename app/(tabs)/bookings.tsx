@@ -206,7 +206,9 @@ export default function BookingsScreen() {
     const payer = booking.payerEmail?.trim().toLowerCase();
     const guest = booking.email?.trim().toLowerCase();
     const current = user?.email?.trim().toLowerCase();
-    const isOther = Boolean(payer && current && payer !== current) || Boolean(payer && guest && payer !== guest);
+    const isOther = booking.isPayer !== undefined
+      ? booking.isPayer && !booking.isGuest
+      : Boolean(payer && current && payer === current && guest !== current);
     return bookingFilter === 'others' ? isOther : !isOther;
   });
 
@@ -439,7 +441,7 @@ export default function BookingsScreen() {
                   <Text style={styles.venueText}>{b.venueName}</Text>
                 </View>
                 {b.payerEmail && b.payerEmail.toLowerCase() !== b.email.toLowerCase() && (
-                  <Text style={styles.paidByText}>Paid by {b.payerName || b.payerEmail}</Text>
+                  <Text style={styles.paidByText}>{b.isPayer ? 'You paid for this experience' : `Paid by ${b.payerName || b.payerEmail}`}</Text>
                 )}
 
                 {/* Arrival Code Banner */}

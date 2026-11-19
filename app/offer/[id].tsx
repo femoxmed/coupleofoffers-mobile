@@ -472,10 +472,18 @@ export default function OfferDetailScreen() {
       Alert.alert('Select arrival time', 'Choose a date and time first so the request contains the exact booking details.');
       return;
     }
-    const link = `https://coupleofoffers.com/pay-for?offer=${encodeURIComponent(offer.slug || offer.id)}&slot=${encodeURIComponent(selectedSlot)}&date=${encodeURIComponent(selectedDate)}&guests=${partySize}`;
     try {
-      await Share.share({ title: `Payment request for ${offer.title}`, message: `I found an experience I’d love to share with you. Could you help cover this booking? It includes the exact date, time, guest count, price and venue details:\n\n${link}` });
-    } catch { /* dismissed */ }
+      if (!authUser?.email) {
+        Alert.alert('Sign in first', 'Sign in to create and share a payment request.');
+        return;
+      }
+      const request = await checkoutService.createPaymentRequest({ offerId: offer.id, slotId: selectedSlot, partySize });
+      const link = `https://coupleofoffers.com/pay-for?token=${encodeURIComponent(request.token)}`;
+      const formattedDate = new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' });
+      await Share.share({ title: `Payment request for ${offer.title}`, message: `I found an experience I’d love to share with you. Could you help cover this booking? This request is for ${offer.title} at ${offer.venue_name || offer.venue}, on ${formattedDate}, for ${partySize} ${partySize === 1 ? 'guest' : 'guests'}. It expires in 7 days:\n\n${link}` });
+    } catch (error) {
+      Alert.alert('Could not create payment request', error instanceof Error ? error.message : 'Please try again.');
+    }
   };
 
   if (!isLoading && !offer) {
