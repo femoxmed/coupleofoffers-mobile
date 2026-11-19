@@ -8,7 +8,7 @@ import { checkoutService } from '../services/checkoutService';
 import { useAuthStore } from '../store/useAuthStore';
 
 export default function PayForScreen() {
-  const p = useLocalSearchParams<{ offerId:string; slotId:string; partySize:string; amountKobo:string; email?:string; offerTitle?:string; venueName?:string; slotTime?:string }>();
+  const p = useLocalSearchParams<{ offerId:string; slotId:string; partySize:string; amountKobo:string; email?:string; offerTitle?:string; venueName?:string; slotTime?:string; bookingMessage?:string }>();
   const router = useRouter();
   const user = useAuthStore(s => s.user);
   const [payeeName, setPayeeName] = useState('');
@@ -22,7 +22,7 @@ export default function PayForScreen() {
     if (!user && (!payerName.trim() || !payerEmail.includes('@'))) return Alert.alert('Your details required', 'Enter your name and email so the payment can be attributed to you.');
     setBusy(true);
     try {
-      const result = await checkoutService.initBachsCheckout({ offerId:p.offerId, slotId:p.slotId, partySize:Number(p.partySize)||2, totalKobo:Number(p.amountKobo)||0, email:payeeEmail.trim(), payerEmail:user?.email || payerEmail.trim(), payerName:user?.name || payerName.trim(), payeeName:payeeName.trim(), beneficiaryPhone:phone.trim(), offerTitle:p.offerTitle, venueName:p.venueName, slotTime:p.slotTime });
+      const result = await checkoutService.initBachsCheckout({ offerId:p.offerId, slotId:p.slotId, partySize:Number(p.partySize)||2, totalKobo:Number(p.amountKobo)||0, email:payeeEmail.trim(), payerEmail:user?.email || payerEmail.trim(), payerName:user?.name || payerName.trim(), payeeName:payeeName.trim(), beneficiaryPhone:phone.trim(), bookingMessage:p.bookingMessage, offerTitle:p.offerTitle, venueName:p.venueName, slotTime:p.slotTime });
       router.replace({ pathname:'/checkout', params:{ authUrl:result.authorizationUrl, reference:result.reference, offerId:p.offerId, slotId:p.slotId, partySize:p.partySize, amountKobo:p.amountKobo, email:payeeEmail, offerTitle:p.offerTitle, venueName:p.venueName, slotTime:p.slotTime } });
     } catch (e) { Alert.alert('Unable to continue', e instanceof Error ? e.message : 'Please try again.'); } finally { setBusy(false); }
   };

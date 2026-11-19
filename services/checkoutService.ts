@@ -15,6 +15,14 @@ export interface CheckoutInitParams {
   payerName?: string;
   payeeName?: string;
   beneficiaryPhone?: string;
+  bookingMessage?: string;
+}
+
+export interface OfferEnquiryParams {
+  offerId: string;
+  name?: string;
+  email?: string;
+  message: string;
 }
 
 export interface CheckoutInitResponse {
@@ -82,9 +90,16 @@ export const checkoutService = {
     });
     const data = await apiClient<CheckoutInitResponse>(`/api/v1/offers/${params.offerId}/checkout`, {
       method: 'POST',
-      body: JSON.stringify({ requestId, slotId: params.slotId, partySize: params.partySize, expectedTotalKobo: params.totalKobo, email: params.email, payerEmail: params.payerEmail, payerName: params.payerName, payeeName: params.payeeName, beneficiaryPhone: params.beneficiaryPhone }),
+      body: JSON.stringify({ requestId, slotId: params.slotId, partySize: params.partySize, expectedTotalKobo: params.totalKobo, email: params.email, payerEmail: params.payerEmail, payerName: params.payerName, payeeName: params.payeeName, beneficiaryPhone: params.beneficiaryPhone, bookingMessage: params.bookingMessage }),
     });
     return data;
+  },
+
+  async sendOfferEnquiry(params: OfferEnquiryParams): Promise<void> {
+    await apiClient(`/api/v1/offers/${encodeURIComponent(params.offerId)}/enquiries`, {
+      method: 'POST',
+      body: JSON.stringify({ name: params.name, email: params.email, message: params.message }),
+    });
   },
 
   async resumeBooking(reference: string): Promise<{ reference: string; authorizationUrl?: string; status?: string }> {

@@ -74,8 +74,16 @@ export default function OfferDetailScreen() {
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [partyChoice, setPartyChoice] = useState<{ offerId: string; size: number } | null>(null);
   const [email, setEmail] = useState<string>(authUser?.email || '');
+  const [bookingMessage, setBookingMessage] = useState('');
   const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
+  const [isEnquiryModalVisible, setIsEnquiryModalVisible] = useState(false);
+  const [enquiryName, setEnquiryName] = useState(authUser?.name || '');
+  const [enquiryEmail, setEnquiryEmail] = useState(authUser?.email || '');
+  const [enquiryMessage, setEnquiryMessage] = useState('');
+  const [enquiryBusy, setEnquiryBusy] = useState(false);
+  const [enquiryError, setEnquiryError] = useState('');
+  const [enquirySent, setEnquirySent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Web-parity dropdown and calendar picker states
@@ -393,6 +401,7 @@ export default function OfferDetailScreen() {
         partySize,
         totalKobo: calculatedTotalKobo,
         email: userEmail,
+        bookingMessage: bookingMessage.trim(),
         offerTitle: offer?.title,
         venueName: cleanVenueName,
         venueAddress: resolvedVenueAddress,
@@ -430,13 +439,31 @@ export default function OfferDetailScreen() {
     }
   };
 
+  const handleSubmitEnquiry = async () => {
+    if (!offer || enquiryMessage.trim().length < 5 || !/^\S+@\S+\.\S+$/.test(enquiryEmail.trim())) {
+      setEnquiryError(enquiryMessage.trim().length < 5 ? 'Please enter a question of at least 5 characters.' : 'Enter a valid email so the partner can reply.');
+      return;
+    }
+    setEnquiryBusy(true);
+    setEnquiryError('');
+    try {
+      await checkoutService.sendOfferEnquiry({ offerId: offer.id, name: enquiryName.trim(), email: enquiryEmail.trim(), message: enquiryMessage.trim() });
+      setEnquirySent(true);
+      setEnquiryMessage('');
+    } catch (error) {
+      setEnquiryError(error instanceof Error ? error.message : 'Could not send your question.');
+    } finally {
+      setEnquiryBusy(false);
+    }
+  };
+
   const handlePayForMe = () => {
     if (!offer || !selectedDate || !selectedSlot) {
       Alert.alert('Select arrival time', 'Please choose an arrival date and time first.');
       return;
     }
     const slotObj = allSlots.find(s => s.id === selectedSlot);
-    router.push({ pathname: '/pay-for', params: { offerId: offer.id, slotId: selectedSlot, partySize: String(partySize), amountKobo: String(calculatedTotalKobo), offerTitle: offer.title, venueName: cleanVenueName, slotTime: slotObj?.starts_at || '' } });
+    router.push({ pathname: '/pay-for', params: { offerId: offer.id, slotId: selectedSlot, partySize: String(partySize), amountKobo: String(calculatedTotalKobo), offerTitle: offer.title, venueName: cleanVenueName, slotTime: slotObj?.starts_at || '', bookingMessage: bookingMessage.trim() } });
     setIsBookingModalVisible(false);
   };
 
@@ -661,7 +688,10 @@ export default function OfferDetailScreen() {
           )}
 
           {/* What's Included */}
-          <Text style={styles.sectionHeading}>What's Included</Text>
+          {offer.short_description ? (
+            <Text style={styles.shortDescription}>{offer.short_description}</Text>
+          ) : null}
+          <Text style={styles.sectionHeading}>What&apos;s Included</Text>
           <View style={styles.inclusionsCard}>
             {inclusionLines.length > 0 ? (
               inclusionLines.map((line, idx) => (
@@ -714,6 +744,10 @@ export default function OfferDetailScreen() {
               <TouchableOpacity style={styles.venueDirectionsLink} onPress={handleOpenDirections} activeOpacity={0.8}><Navigation size={14} color={Palette.mulberry}/><Text style={styles.venuePreviewLinkText}>Directions</Text></TouchableOpacity>
             </View>
           </View>
+          <TouchableOpacity style={styles.enquiryButton} onPress={() => { setEnquiryError(''); setEnquirySent(false); setIsEnquiryModalVisible(true); }} activeOpacity={0.85}>
+            <Mail size={16} color={Palette.mulberry} />
+            <Text style={styles.enquiryButtonText}>Ask {cleanVenueName} a question</Text>
+          </TouchableOpacity>
 
           {/* Getting There & Location */}
 
@@ -1252,6 +1286,21 @@ export default function OfferDetailScreen() {
                 </Text>
               </View>
 
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionLabel}>Message to {cleanVenueName} <Text style={{ color: Palette.mutedText, fontWeight: '400' }}>(optional)</Text></Text>
+                <TextInput
+                  value={bookingMessage}
+                  onChangeText={setBookingMessage}
+                  maxLength={500}
+                  multiline
+                  textAlignVertical="top"
+                  placeholder="Share a short note about allergies, dietary needs, or special instructions."
+                  placeholderTextColor={Palette.mutedText}
+                  style={styles.bookingMessageInput}
+                />
+                <Text style={styles.inputHelperText}>Shared with the partner after your booking is confirmed. {bookingMessage.length}/500</Text>
+              </View>
+
               {/* Security Reassurance */}
               <View style={styles.appleNoticeBox}>
                 <ShieldCheck size={14} color={Palette.goldInk} style={{ marginRight: 6 }} />
@@ -1321,6 +1370,23 @@ export default function OfferDetailScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      <Modal visible={isEnquiryModalVisible} transparent animationType="slide" onRequestClose={() => setIsEnquiryModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.enquiryOverlay}>
+          <View style={styles.enquirySheet}>
+            <View style={styles.enquiryHeader}><View style={{ flex: 1 }}><Text style={styles.shareEyebrow}>ASK THE PARTNER</Text><Text style={styles.shareTitle}>Questions about this experience?</Text></View><TouchableOpacity onPress={() => setIsEnquiryModalVisible(false)} style={styles.modalCloseBtn}><X size={20} color={Palette.aubergine}/></TouchableOpacity></View>
+            <Text style={styles.enquiryIntro}>Ask {cleanVenueName} about ingredients, allergies, dietary needs, or anything else before booking.</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <TextInput value={enquiryName} onChangeText={setEnquiryName} maxLength={120} placeholder="Your name (optional)" placeholderTextColor={Palette.mutedText} style={styles.enquiryInput}/>
+              <TextInput value={enquiryEmail} onChangeText={setEnquiryEmail} maxLength={254} keyboardType="email-address" autoCapitalize="none" placeholder="Email for the partner’s reply" placeholderTextColor={Palette.mutedText} style={styles.enquiryInput}/>
+              <TextInput value={enquiryMessage} onChangeText={setEnquiryMessage} maxLength={2000} multiline textAlignVertical="top" placeholder="What would you like to know?" placeholderTextColor={Palette.mutedText} style={[styles.enquiryInput, styles.enquiryMessageInput]}/>
+              <Text style={styles.inputHelperText}>{enquiryMessage.length}/2000 characters</Text>
+              {enquirySent && <Text style={styles.enquirySuccess}>Your question has been sent to the partner.</Text>}
+              {enquiryError ? <Text style={styles.enquiryError}>{enquiryError}</Text> : null}
+              <TouchableOpacity disabled={enquiryBusy} onPress={handleSubmitEnquiry} style={[styles.enquirySubmit, enquiryBusy && { opacity: 0.6 }]}><Text style={styles.enquirySubmitText}>{enquiryBusy ? 'Sending…' : 'Send question'}</Text></TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1593,6 +1659,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     letterSpacing: -0.2,
   },
+  shortDescription: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: Palette.mutedText,
+    marginBottom: 12,
+  },
   inclusionsCard: {
     backgroundColor: Palette.card,
     borderRadius: 14,
@@ -1620,6 +1692,19 @@ const styles = StyleSheet.create({
   venuePreviewNotes: { paddingHorizontal: 14, paddingBottom: 12, fontSize: 12, lineHeight: 18, color: Palette.mutedText },
   venuePreviewActions: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: Palette.border, backgroundColor: Palette.secondaryBg },
   venueDirectionsLink: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 12, borderLeftWidth: 1, borderLeftColor: Palette.border },
+  enquiryButton: { marginHorizontal: 16, marginTop: 8, minHeight: 44, borderRadius: 14, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.card, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  enquiryButtonText: { color: Palette.mulberry, fontWeight: '800', fontSize: 13 },
+  enquiryOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(48,29,50,0.42)' },
+  enquirySheet: { maxHeight: '88%', backgroundColor: Palette.porcelain, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 30 },
+  enquiryHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  enquiryIntro: { color: Palette.mutedText, fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  enquiryInput: { minHeight: 48, borderWidth: 1, borderColor: Palette.border, borderRadius: 12, backgroundColor: Palette.card, paddingHorizontal: 13, paddingVertical: 12, color: Palette.aubergine, fontSize: 14, marginBottom: 10 },
+  enquiryMessageInput: { minHeight: 120 },
+  enquirySuccess: { color: '#28734A', fontSize: 13, fontWeight: '700', marginTop: 8 },
+  enquiryError: { color: '#B42318', fontSize: 13, marginTop: 8 },
+  enquirySubmit: { alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 24, backgroundColor: Palette.mulberry, marginTop: 12 },
+  enquirySubmitText: { color: Palette.porcelain, fontSize: 15, fontWeight: '800' },
+  bookingMessageInput: { minHeight: 88, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.card, borderRadius: 12, color: Palette.aubergine, paddingHorizontal: 13, paddingVertical: 10, fontSize: 14 },
   inclusionItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',

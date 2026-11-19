@@ -208,10 +208,36 @@ export default function PartnerDetailScreen() {
         </View>
 
         {/* 5. Bio / About the Venue */}
-        {partner.description ? (
+        {partner.description || partner.opening_hours?.length || partner.branches?.some(branch => branch.opening_hours?.length) ? (
           <View style={styles.aboutCard}>
-            <Text style={styles.aboutTitle}>About the Venue</Text>
-            <Text style={styles.aboutText}>{partner.description}</Text>
+            {partner.description ? <><Text style={styles.aboutTitle}>About the Venue</Text><Text style={styles.aboutText}>{partner.description}</Text></> : null}
+            {partner.opening_hours?.length ? (
+              <View style={styles.hoursBlock}>
+                <Text style={styles.aboutTitle}>Opening Hours</Text>
+                {partner.opening_hours.map((hours) => (
+                  <View key={hours.day} style={styles.hoursRow}>
+                    <Text style={styles.aboutText}>{hours.day}</Text>
+                    <Text style={styles.aboutText}>{hours.open ? `${hours.start} – ${hours.end}` : 'Closed'}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {!partner.opening_hours?.length && partner.branches?.some(branch => branch.opening_hours?.length) ? (
+              <View style={styles.hoursBlock}>
+                <Text style={styles.aboutTitle}>Branch Opening Hours</Text>
+                {partner.branches.filter(branch => branch.opening_hours?.length).map(branch => (
+                  <View key={branch.id} style={styles.branchHoursGroup}>
+                    <Text style={styles.branchHoursName}>{branch.name}</Text>
+                    {branch.opening_hours!.map(hours => (
+                      <View key={hours.day} style={styles.hoursRow}>
+                        <Text style={styles.aboutText}>{hours.day}</Text>
+                        <Text style={styles.aboutText}>{hours.open ? `${hours.start} – ${hours.end}` : 'Closed'}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -479,6 +505,10 @@ const styles = StyleSheet.create({
     color: Palette.mutedText,
     lineHeight: 19,
   },
+  hoursBlock: { marginTop: 14 },
+  hoursRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 3 },
+  branchHoursGroup: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Palette.border },
+  branchHoursName: { fontSize: 13, fontWeight: '700', color: Palette.aubergine, marginBottom: 4 },
   packagesSection: {
     paddingHorizontal: 16,
     marginTop: 14,

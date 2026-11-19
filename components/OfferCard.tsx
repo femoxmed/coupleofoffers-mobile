@@ -100,11 +100,12 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
             {offer.title}
           </Text>
 
-          {offer.inclusions ? (
+          {offer.short_description || offer.inclusions ? (
             <Text style={styles.compactInclusions} numberOfLines={1}>
-              {offer.inclusions.replace(/\n/g, ' • ')}
+              {(offer.short_description || offer.inclusions).replace(/\n/g, ' • ')}
             </Text>
           ) : null}
+          {allowsExtraGuests && <Text style={styles.extraGuestHint} numberOfLines={1}>Each extra guest {formatNaira(offer.extra_friend_price_kobo || 0)} · Max {offer.max_party_size}</Text>}
 
           <View style={styles.compactFooter}>
             <View style={styles.priceRow}>
@@ -174,6 +175,7 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
         <Text style={styles.featuredTitle} numberOfLines={2}>
           {offer.title}
         </Text>
+        {allowsExtraGuests && <Text style={styles.featuredExtraGuestHint}>Each extra guest {formatNaira(offer.extra_friend_price_kobo || 0)} · Max {offer.max_party_size}</Text>}
 
         <View style={styles.featuredFooter}>
           <View style={styles.priceRow}>
@@ -213,7 +215,7 @@ const styles = StyleSheet.create({
   },
   compactImageWrapper: {
     width: 105,
-    height: 105,
+    height: 123,
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
@@ -278,6 +280,7 @@ const styles = StyleSheet.create({
     color: Palette.mutedText,
     marginTop: 2,
   },
+  extraGuestHint: { fontSize: 10, lineHeight: 13, color: Palette.mulberry, fontWeight: '700', marginTop: 2 },
   compactFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -393,6 +396,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     letterSpacing: -0.3,
   },
+  featuredExtraGuestHint: { fontSize: 11, color: Palette.mulberry, fontWeight: '700', marginTop: 2 },
   featuredFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',

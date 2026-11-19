@@ -4,6 +4,7 @@ export type OfferBranch = {
   address: string | null;
   offer_id: string;
   slug: string;
+  opening_hours?: { day: string; open: boolean; start?: string; end?: string }[] | null;
 };
 
 export type Offer = {
@@ -14,6 +15,7 @@ export type Offer = {
   venue: string;
   partner?: string;
   inclusions: string;
+  short_description?: string | null;
   regular_price_kobo: number | null;
   regular_extra_guest_kobo?: number | null;
   price_kobo: number;
@@ -50,6 +52,8 @@ export type Partner = {
   banner_url?: string | null;
   logo_url?: string | null;
   featured_at?: string | null;
+  opening_hours?: { day: string; open: boolean; start?: string; end?: string }[] | null;
+  branches?: { id: string; name: string; address: string | null; opening_hours?: { day: string; open: boolean; start?: string; end?: string }[] | null }[];
 };
 
 export type Slot = {
