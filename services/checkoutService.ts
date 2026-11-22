@@ -56,6 +56,8 @@ export interface ConfirmedBooking {
     | 'completed'
     | 'refund_pending'
     | 'refund_submitted'
+    | 'refunded'
+    | 'refund_failed'
     | 'review'
     | 'cancelled';
   checkoutExpiresAt?: string;

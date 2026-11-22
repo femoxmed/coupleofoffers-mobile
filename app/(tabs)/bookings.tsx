@@ -169,6 +169,8 @@ export default function BookingsScreen() {
       const isRefundState = [
         'refund_pending',
         'refund_submitted',
+        'refunded',
+        'refund_failed',
         'review',
         'cancelled',
       ].includes(b.status);
@@ -392,6 +394,8 @@ export default function BookingsScreen() {
             const isRefund = [
               'refund_pending',
               'refund_submitted',
+              'refunded',
+              'refund_failed',
               'review',
               'cancelled',
             ].includes(b.status);
@@ -419,6 +423,12 @@ export default function BookingsScreen() {
                     >
                       {b.status === 'refund_pending'
                         ? 'Refund Pending'
+                        : b.status === 'refund_submitted'
+                        ? 'Refund Submitted'
+                        : b.status === 'refunded'
+                        ? 'Refund Completed'
+                        : b.status === 'refund_failed'
+                        ? 'Refund Failed'
                         : b.status === 'review'
                         ? 'Concierge Review'
                         : b.status === 'cancelled'
