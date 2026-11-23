@@ -85,6 +85,10 @@ export default function OfferDetailScreen() {
   const [enquiryError, setEnquiryError] = useState('');
   const [enquirySent, setEnquirySent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [payForSomeone, setPayForSomeone] = useState(false);
+  const [payerName, setPayerName] = useState(authUser?.name || '');
+  const [payerEmail, setPayerEmail] = useState(authUser?.email || '');
+  const [beneficiaryPhone, setBeneficiaryPhone] = useState('');
 
   // Web-parity dropdown and calendar picker states
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
@@ -367,13 +371,41 @@ export default function OfferDetailScreen() {
       return;
     }
 
-    const userEmail = (authUser?.email || email).trim();
-    if (!userEmail || !userEmail.includes('@') || !userEmail.includes('.')) {
-      Alert.alert(
-        'Email Required',
-        'Please enter a valid email address where your booking confirmation and 4-digit check-in PIN can be delivered.'
-      );
-      return;
+    let bookingRecipientEmail = '';
+    let effectivePayerEmail = '';
+    let effectivePayerName = '';
+
+    if (payForSomeone) {
+      bookingRecipientEmail = email.trim();
+      if (!bookingRecipientEmail || !bookingRecipientEmail.includes('@') || !bookingRecipientEmail.includes('.')) {
+        Alert.alert(
+          'Guest Email Required',
+          'Please enter the guest’s email address where their booking confirmation and check-in PIN can be delivered.'
+        );
+        return;
+      }
+      effectivePayerEmail = (authUser?.email || payerEmail).trim();
+      if (!effectivePayerEmail || !effectivePayerEmail.includes('@') || !effectivePayerEmail.includes('.')) {
+        Alert.alert(
+          'Payer Email Required',
+          'Please enter your email address as the payer so you receive payment receipts and updates.'
+        );
+        return;
+      }
+      effectivePayerName = (authUser?.name || payerName).trim();
+      if (!effectivePayerName) {
+        Alert.alert('Payer Name Required', 'Please enter your name as the payer.');
+        return;
+      }
+    } else {
+      bookingRecipientEmail = (authUser?.email || email).trim();
+      if (!bookingRecipientEmail || !bookingRecipientEmail.includes('@') || !bookingRecipientEmail.includes('.')) {
+        Alert.alert(
+          'Email Required',
+          'Please enter a valid email address where your booking confirmation and 4-digit check-in PIN can be delivered.'
+        );
+        return;
+      }
     }
 
     const slotObj = allSlots.find((s) => s.id === selectedSlot);
@@ -400,7 +432,10 @@ export default function OfferDetailScreen() {
         slotId: selectedSlot,
         partySize,
         totalKobo: calculatedTotalKobo,
-        email: userEmail,
+        email: bookingRecipientEmail,
+        payerEmail: payForSomeone ? effectivePayerEmail : undefined,
+        payerName: payForSomeone ? effectivePayerName : undefined,
+        beneficiaryPhone: payForSomeone && beneficiaryPhone.trim() ? beneficiaryPhone.trim() : undefined,
         bookingMessage: bookingMessage.trim(),
         offerTitle: offer?.title,
         venueName: cleanVenueName,
@@ -421,7 +456,7 @@ export default function OfferDetailScreen() {
           slotId: selectedSlot,
           partySize: partySize.toString(),
           amountKobo: calculatedTotalKobo.toString(),
-          email: userEmail,
+          email: bookingRecipientEmail,
           offerTitle: offer?.title || 'Experience',
           venueName: cleanVenueName,
           venueAddress: resolvedVenueAddress,
@@ -1274,13 +1309,13 @@ export default function OfferDetailScreen() {
                 )}
               </View>
 
-              {/* 5. Receipt Email (Prepopulated and disabled for editing if user is logged in) */}
+              {/* 5. Receipt Email */}
               <View style={styles.modalSection}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={[styles.modalSectionLabel, { marginBottom: 0 }]}>
-                    Receipt & Voucher Email
+                    {payForSomeone ? 'Guest’s Receipt Email' : 'Receipt & Voucher Email'}
                   </Text>
-                  {Boolean(authUser?.email) && (
+                  {!payForSomeone && Boolean(authUser?.email) && (
                     <View style={styles.verifiedBadgeRow}>
                       <ShieldCheck size={12} color={Palette.goldInk} />
                       <Text style={styles.verifiedBadgeText}>Verified Account</Text>
@@ -1290,36 +1325,115 @@ export default function OfferDetailScreen() {
                 <View
                   style={[
                     styles.inputWrap,
-                    Boolean(authUser?.email) && styles.inputWrapDisabled,
+                    !payForSomeone && Boolean(authUser?.email) && styles.inputWrapDisabled,
                   ]}
                 >
                   <Mail
-                    size={16}
-                    color={Boolean(authUser?.email) ? Palette.mutedText : Palette.mulberry}
+                    size={15}
+                    color={!payForSomeone && Boolean(authUser?.email) ? Palette.mutedText : Palette.mulberry}
                     style={{ marginRight: 8 }}
                   />
                   <TextInput
                     style={[
                       styles.emailInput,
-                      Boolean(authUser?.email) && styles.emailInputDisabled,
+                      !payForSomeone && Boolean(authUser?.email) && styles.emailInputDisabled,
                     ]}
-                    placeholder="Enter your email address"
+                    placeholder={payForSomeone ? "guest@example.com" : "Enter your email address"}
                     placeholderTextColor={Palette.mutedText}
                     keyboardType="email-address"
                     autoCapitalize="none"
-                    value={authUser?.email || email}
-                    editable={!authUser?.email}
+                    value={!payForSomeone && authUser?.email ? authUser.email : email}
+                    editable={payForSomeone || !authUser?.email}
                     onChangeText={setEmail}
                   />
-                  {Boolean(authUser?.email) && (
+                  {!payForSomeone && Boolean(authUser?.email) && (
                     <Lock size={13} color={Palette.mutedText} style={{ marginLeft: 6 }} />
                   )}
                 </View>
                 <Text style={styles.inputHelperText}>
-                  {Boolean(authUser?.email)
-                    ? 'Your 4-digit arrival check-in PIN and booking confirmation will be sent to your account email.'
-                    : 'Your 4-digit arrival check-in PIN and booking confirmation will be sent here.'}
+                  {payForSomeone
+                    ? 'Booking details and the 4-digit check-in PIN will be sent to the guest.'
+                    : Boolean(authUser?.email)
+                    ? 'Your 4-digit arrival check-in PIN will be sent to your account email.'
+                    : 'Your 4-digit arrival check-in PIN will be sent here.'}
                 </Text>
+
+                {/* "I'm paying for someone else" Checkbox / Toggle */}
+                <TouchableOpacity
+                  style={[
+                    styles.payForSomeoneCard,
+                    payForSomeone && styles.payForSomeoneCardActive,
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    const next = !payForSomeone;
+                    setPayForSomeone(next);
+                    if (next) {
+                      setEmail('');
+                    } else {
+                      setEmail(authUser?.email || '');
+                    }
+                  }}
+                >
+                  <View style={[styles.checkboxBox, payForSomeone && styles.checkboxBoxActive]}>
+                    {payForSomeone && <Check size={11} color="#FFFFFF" strokeWidth={3} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.payForSomeoneTitle}>I’m paying for someone else</Text>
+                    <Text style={styles.payForSomeoneSub}>The guest owns the booking; you receive payment updates.</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Payer details if paying for someone else */}
+                {payForSomeone && (
+                  <View style={styles.payerDetailsCard}>
+                    <Text style={styles.payerDetailsNotice}>
+                      {authUser?.email
+                        ? `You will pay as ${authUser.name || authUser.email} (${authUser.email}).`
+                        : 'Enter your details as the payer. The guest above remains the booking owner.'}
+                    </Text>
+
+                    {!authUser?.email && (
+                      <>
+                        <Text style={styles.payerInputLabel}>Your Name</Text>
+                        <View style={styles.inputWrap}>
+                          <TextInput
+                            style={styles.emailInput}
+                            placeholder="Your full name"
+                            placeholderTextColor={Palette.mutedText}
+                            value={payerName}
+                            onChangeText={setPayerName}
+                          />
+                        </View>
+
+                        <Text style={styles.payerInputLabel}>Your Email</Text>
+                        <View style={styles.inputWrap}>
+                          <TextInput
+                            style={styles.emailInput}
+                            placeholder="you@example.com"
+                            placeholderTextColor={Palette.mutedText}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            value={payerEmail}
+                            onChangeText={setPayerEmail}
+                          />
+                        </View>
+                      </>
+                    )}
+
+                    <Text style={styles.payerInputLabel}>Guest Phone <Text style={{ fontWeight: '400', color: Palette.mutedText }}>(optional)</Text></Text>
+                    <View style={styles.inputWrap}>
+                      <TextInput
+                        style={styles.emailInput}
+                        placeholder="+234 800 000 0000"
+                        placeholderTextColor={Palette.mutedText}
+                        keyboardType="phone-pad"
+                        value={beneficiaryPhone}
+                        onChangeText={setBeneficiaryPhone}
+                      />
+                    </View>
+                  </View>
+                )}
               </View>
 
               <View style={styles.modalSection}>
@@ -1366,7 +1480,7 @@ export default function OfferDetailScreen() {
                 <View style={styles.bottomBookContent}>
                   <View style={styles.bottomBookMainRow}>
                     <Text style={styles.bottomBookTitle}>
-                      {isSubmitting ? 'Preparing...' : !selectedDate ? 'Select Date' : !selectedSlot ? 'Select Time' : 'Checkout'}
+                      {isSubmitting ? 'Preparing...' : !selectedDate ? 'Select Date' : !selectedSlot ? 'Select Time' : payForSomeone ? 'Continue' : 'Checkout'}
                     </Text>
                     <Text style={styles.bottomBookPrice}>{formatNaira(calculatedTotalKobo)}</Text>
                   </View>
@@ -1616,30 +1730,30 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.card,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: 14,
-    padding: 14,
-    marginTop: 4,
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 2,
   },
   partyLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   partyIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(116, 61, 96, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   partyLabel: {
-    fontSize: 15,
+    fontSize: 13.5,
     fontWeight: '700',
     color: Palette.aubergine,
   },
   partySub: {
-    fontSize: 12,
+    fontSize: 10.5,
     color: Palette.mutedText,
     marginTop: 1,
   },
@@ -1728,7 +1842,7 @@ const styles = StyleSheet.create({
   enquiryError: { color: '#B42318', fontSize: 13, marginTop: 8 },
   enquirySubmit: { alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 24, backgroundColor: Palette.mulberry, marginTop: 12 },
   enquirySubmitText: { color: Palette.porcelain, fontSize: 15, fontWeight: '800' },
-  bookingMessageInput: { minHeight: 88, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.card, borderRadius: 12, color: Palette.aubergine, paddingHorizontal: 13, paddingVertical: 10, fontSize: 14 },
+  bookingMessageInput: { minHeight: 52, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.card, borderRadius: 10, color: Palette.aubergine, paddingHorizontal: 11, paddingVertical: 7, fontSize: 13 },
   inclusionItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -2038,8 +2152,8 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     maxHeight: '92%',
     height: '90%',
     display: 'flex',
@@ -2048,57 +2162,58 @@ const styles = StyleSheet.create({
   },
   modalHandleWrap: {
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingTop: 8,
+    paddingBottom: 4,
     backgroundColor: '#FFFFFF',
   },
   modalDragHandle: {
-    width: 40,
-    height: 4.5,
-    borderRadius: 2.5,
+    width: 36,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: Palette.border,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: Palette.border,
     backgroundColor: '#FFFFFF',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: Palette.aubergine,
   },
   modalSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: Palette.mutedText,
     marginTop: 1,
   },
   modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: 'rgba(48, 29, 50, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalScrollContent: {
-    padding: 20,
-    paddingBottom: 24,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 16,
     backgroundColor: Palette.porcelain,
   },
   modalSection: {
-    marginBottom: 16,
+    marginBottom: 11,
   },
   modalSectionLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: Palette.aubergine,
-    marginBottom: 8,
+    marginBottom: 5,
   },
 
   /* Dropdown Styles (Branch, Date, Time) */
@@ -2109,9 +2224,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E8DBC6',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
@@ -2129,14 +2244,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   dropdownValueText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: Palette.aubergine,
   },
   dropdownSubText: {
-    fontSize: 11.5,
+    fontSize: 11,
     color: Palette.mutedText,
-    marginTop: 2,
+    marginTop: 1,
   },
   dropdownMenu: {
     backgroundColor: '#FFFFFF',
@@ -2341,9 +2456,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E8DBC6',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
   },
   inputWrapDisabled: {
     backgroundColor: '#F7F2EC',
@@ -2351,13 +2466,73 @@ const styles = StyleSheet.create({
   },
   emailInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: Palette.aubergine,
     padding: 0,
   },
   emailInputDisabled: {
     color: Palette.aubergine,
     fontWeight: '600',
+  },
+  payForSomeoneCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    backgroundColor: Palette.secondaryBg,
+    borderWidth: 1.5,
+    borderColor: Palette.border,
+    borderRadius: 11,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  payForSomeoneCardActive: {
+    borderColor: Palette.mulberry,
+    backgroundColor: '#F8EEF3',
+  },
+  checkboxBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: Palette.mulberry,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxBoxActive: {
+    backgroundColor: Palette.mulberry,
+  },
+  payForSomeoneTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Palette.aubergine,
+  },
+  payForSomeoneSub: {
+    fontSize: 10.5,
+    color: Palette.mutedText,
+    marginTop: 1,
+  },
+  payerDetailsCard: {
+    backgroundColor: '#F8F4EF',
+    borderWidth: 1,
+    borderColor: '#E8DBC6',
+    borderRadius: 11,
+    padding: 10,
+    marginTop: 8,
+    gap: 5,
+  },
+  payerDetailsNotice: {
+    fontSize: 10.5,
+    color: Palette.mutedText,
+    lineHeight: 14,
+    marginBottom: 2,
+  },
+  payerInputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.aubergine,
+    marginTop: 4,
   },
   payForMeButton: {
     position: 'absolute',
@@ -2380,10 +2555,10 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   inputHelperText: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: Palette.mutedText,
-    marginTop: 5,
-    lineHeight: 15,
+    marginTop: 3,
+    lineHeight: 14,
   },
   breakdownCard: {
     backgroundColor: '#FFFFFF',
@@ -2446,15 +2621,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(228, 187, 129, 0.4)',
     borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
+    padding: 8,
+    marginBottom: 6,
   },
   appleNoticeText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 10.5,
     color: '#8F662A',
     fontWeight: '600',
-    lineHeight: 15,
+    lineHeight: 14,
   },
 
   /* Fixed Bottom Nav in Modal */

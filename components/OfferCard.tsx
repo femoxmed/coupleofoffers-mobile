@@ -87,12 +87,6 @@ export function OfferCard({ offer, layout = 'compact', distanceBadge, width }: O
               fill={saved ? Palette.saved : 'transparent'}
             />
           </Pressable>
-
-          <View style={styles.compactPartyBadge}>
-            <Text style={styles.compactPartyBadgeText}>
-              {partyBadgeLabel}
-            </Text>
-          </View>
         </View>
 
         {/* Right: Info */}
@@ -116,17 +110,23 @@ export function OfferCard({ offer, layout = 'compact', distanceBadge, width }: O
           {allowsExtraGuests && <Text style={styles.extraGuestHint} numberOfLines={1}>Each extra guest {formatNaira(offer.extra_friend_price_kobo || 0)} · Max {offer.max_party_size}</Text>}
 
           <View style={styles.compactFooter}>
-            <View style={styles.priceRow}>
-              <Text style={styles.compactPrice}>{formatNaira(offer.price_kobo)}</Text>
-              {hasDiscount ? (
-                <Text style={styles.compactRegularPrice}>
-                  {formatNaira(offer.regular_price_kobo)}
-                </Text>
-              ) : null}
+            <View style={styles.priceContainer}>
+              <View style={styles.priceRow}>
+                <Text style={styles.compactPrice}>{formatNaira(offer.price_kobo)}</Text>
+                {hasDiscount ? (
+                  <Text style={styles.compactRegularPrice}>
+                    {formatNaira(offer.regular_price_kobo)}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={styles.guestRow}>
+                <Users size={9.5} color={Palette.mutedText} style={{ marginRight: 3 }} />
+                <Text style={styles.guestSubtitle}>{partyBadgeLabel}</Text>
+              </View>
             </View>
 
             <View style={styles.compactBookPill}>
-              <Text style={styles.compactBookPillText}>Book Offer</Text>
+              <Text style={styles.compactBookPillText}>Book</Text>
             </View>
           </View>
         </View>
@@ -153,10 +153,6 @@ export function OfferCard({ offer, layout = 'compact', distanceBadge, width }: O
                   <Text style={styles.featuredDistanceBadgeText}>{distanceBadge}</Text>
                 </View>
               ) : null}
-              <View style={styles.partyBadge}>
-                <Users size={10} color={Palette.aubergine} style={{ marginRight: 3.5 }} />
-                <Text style={styles.partyBadgeText}>{partyBadgeLabel}</Text>
-              </View>
             </View>
 
             <Pressable hitSlop={10} onPress={handleHeartPress} style={styles.heartButton}>
@@ -182,13 +178,19 @@ export function OfferCard({ offer, layout = 'compact', distanceBadge, width }: O
           </Text>
 
           <View style={styles.carouselFooter}>
-            <View style={styles.priceRow}>
-              <Text style={styles.carouselPrice}>{formatNaira(offer.price_kobo)}</Text>
-              {hasDiscount ? (
-                <Text style={styles.compactRegularPrice}>
-                  {formatNaira(offer.regular_price_kobo)}
-                </Text>
-              ) : null}
+            <View style={styles.priceContainer}>
+              <View style={styles.priceRow}>
+                <Text style={styles.carouselPrice}>{formatNaira(offer.price_kobo)}</Text>
+                {hasDiscount ? (
+                  <Text style={styles.compactRegularPrice}>
+                    {formatNaira(offer.regular_price_kobo)}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={styles.guestRow}>
+                <Users size={9.5} color={Palette.mutedText} style={{ marginRight: 3 }} />
+                <Text style={styles.guestSubtitle}>{partyBadgeLabel}</Text>
+              </View>
             </View>
             <View style={styles.carouselBookPill}>
               <Text style={styles.carouselBookPillText}>Book</Text>
@@ -221,12 +223,6 @@ export function OfferCard({ offer, layout = 'compact', distanceBadge, width }: O
                 <Text style={styles.featuredBadgeText}>FEATURED</Text>
               </View>
             )}
-            <View style={styles.partyBadge}>
-              <Users size={11} color={Palette.aubergine} style={{ marginRight: 4 }} />
-              <Text style={styles.partyBadgeText}>
-                {partyBadgeLabel}
-              </Text>
-            </View>
           </View>
 
           <Pressable
@@ -257,13 +253,19 @@ export function OfferCard({ offer, layout = 'compact', distanceBadge, width }: O
         {allowsExtraGuests && <Text style={styles.featuredExtraGuestHint}>Each extra guest {formatNaira(offer.extra_friend_price_kobo || 0)} · Max {offer.max_party_size}</Text>}
 
         <View style={styles.featuredFooter}>
-          <View style={styles.priceRow}>
-            <Text style={styles.featuredPrice}>{formatNaira(offer.price_kobo)}</Text>
-            {hasDiscount ? (
-              <Text style={styles.compactRegularPrice}>
-                {formatNaira(offer.regular_price_kobo)}
-              </Text>
-            ) : null}
+          <View style={styles.priceContainer}>
+            <View style={styles.priceRow}>
+              <Text style={styles.featuredPrice}>{formatNaira(offer.price_kobo)}</Text>
+              {hasDiscount ? (
+                <Text style={styles.compactRegularPrice}>
+                  {formatNaira(offer.regular_price_kobo)}
+                </Text>
+              ) : null}
+            </View>
+            <View style={styles.guestRow}>
+              <Users size={11} color={Palette.mutedText} style={{ marginRight: 3.5 }} />
+              <Text style={styles.featuredGuestSubtitle}>{partyBadgeLabel}</Text>
+            </View>
           </View>
           <View style={styles.bookPill}>
             <Text style={styles.bookPillText}>Book Offer</Text>
@@ -349,7 +351,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     justifyContent: 'space-between',
-    height: 105,
+    minHeight: 105,
     paddingVertical: 2,
   },
   venueRow: {
@@ -379,8 +381,26 @@ const styles = StyleSheet.create({
   compactFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     marginTop: 4,
+  },
+  priceContainer: {
+    justifyContent: 'center',
+  },
+  guestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 1.5,
+  },
+  guestSubtitle: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: Palette.mutedText,
+  },
+  featuredGuestSubtitle: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: Palette.mutedText,
   },
   priceRow: {
     flexDirection: 'row',
@@ -399,14 +419,14 @@ const styles = StyleSheet.create({
   },
   compactBookPill: {
     backgroundColor: Palette.mulberry,
-    paddingHorizontal: 9.5,
-    paddingVertical: 4.5,
-    borderRadius: 12,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 14,
   },
   compactBookPillText: {
     color: '#FFFCF7',
     fontWeight: '700',
-    fontSize: 10.5,
+    fontSize: 11,
   },
 
   // Featured large card
@@ -508,7 +528,7 @@ const styles = StyleSheet.create({
   featuredFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     marginTop: 8,
     borderTopWidth: 1,
     borderTopColor: Palette.muted,
@@ -569,7 +589,7 @@ const styles = StyleSheet.create({
   carouselFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     marginTop: 4,
     borderTopWidth: 1,
     borderTopColor: Palette.muted,
