@@ -11,11 +11,12 @@ import type { Offer } from '../types';
 
 interface OfferCardProps {
   offer: Offer;
-  layout?: 'compact' | 'featured';
+  layout?: 'compact' | 'featured' | 'carousel';
   distanceBadge?: string;
+  width?: number;
 }
 
-export function OfferCard({ offer, layout = 'compact', distanceBadge }: OfferCardProps) {
+export function OfferCard({ offer, layout = 'compact', distanceBadge, width }: OfferCardProps) {
   const router = useRouter();
   const toggleSave = useSavedStore((state) => state.toggleSave);
   const saved = useSavedStore((state) => state.savedOffers.some((o) => o.id === offer.id));
@@ -126,6 +127,71 @@ export function OfferCard({ offer, layout = 'compact', distanceBadge }: OfferCar
 
             <View style={styles.compactBookPill}>
               <Text style={styles.compactBookPillText}>Book Offer</Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // Carousel Card Layout (for horizontal sliders like Near You or Featured)
+  if (layout === 'carousel') {
+    const cardWidth = width || 250;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={handleCardPress}
+        style={[styles.carouselCard, { width: cardWidth }]}
+      >
+        <View style={styles.carouselImageContainer}>
+          <CatalogImage url={offer.image_url} category={offer.category} style={styles.carouselImage} />
+          <View style={styles.badgeRow}>
+            <View style={styles.leftBadges}>
+              {distanceBadge ? (
+                <View style={styles.featuredDistanceBadge}>
+                  <MapPin size={9} color="#FFFCF7" style={{ marginRight: 2.5 }} />
+                  <Text style={styles.featuredDistanceBadgeText}>{distanceBadge}</Text>
+                </View>
+              ) : null}
+              <View style={styles.partyBadge}>
+                <Users size={10} color={Palette.aubergine} style={{ marginRight: 3.5 }} />
+                <Text style={styles.partyBadgeText}>{partyBadgeLabel}</Text>
+              </View>
+            </View>
+
+            <Pressable hitSlop={10} onPress={handleHeartPress} style={styles.heartButton}>
+              <Heart
+                size={14}
+                color={Palette.saved}
+                fill={saved ? Palette.saved : 'transparent'}
+              />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.carouselContent}>
+          <View style={styles.venueRow}>
+            <MapPin size={11} color={Palette.mulberry} style={{ marginRight: 3 }} />
+            <Text style={styles.venueText} numberOfLines={1}>
+              {cleanVenueName}{cleanAddress ? ` • ${cleanAddress}` : ''}
+            </Text>
+          </View>
+
+          <Text style={styles.carouselTitle} numberOfLines={2}>
+            {offer.title}
+          </Text>
+
+          <View style={styles.carouselFooter}>
+            <View style={styles.priceRow}>
+              <Text style={styles.carouselPrice}>{formatNaira(offer.price_kobo)}</Text>
+              {hasDiscount ? (
+                <Text style={styles.compactRegularPrice}>
+                  {formatNaira(offer.regular_price_kobo)}
+                </Text>
+              ) : null}
+            </View>
+            <View style={styles.carouselBookPill}>
+              <Text style={styles.carouselBookPillText}>Book</Text>
             </View>
           </View>
         </View>
@@ -463,5 +529,66 @@ const styles = StyleSheet.create({
     color: '#FFFCF7',
     fontWeight: '700',
     fontSize: 12,
+  },
+
+  // Carousel card styles (for horizontal sliders)
+  carouselCard: {
+    backgroundColor: Palette.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  carouselImageContainer: {
+    height: 125,
+    position: 'relative',
+    backgroundColor: Palette.muted,
+  },
+  carouselImage: {
+    width: '100%',
+    height: '100%',
+  },
+  carouselContent: {
+    padding: 12,
+  },
+  carouselTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: Palette.aubergine,
+    marginTop: 4,
+    marginBottom: 6,
+    lineHeight: 19,
+    letterSpacing: -0.2,
+    minHeight: 38,
+  },
+  carouselFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: Palette.muted,
+    paddingTop: 8,
+  },
+  carouselPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Palette.aubergine,
+  },
+  carouselBookPill: {
+    backgroundColor: Palette.mulberry,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  carouselBookPillText: {
+    color: '#FFFCF7',
+    fontWeight: '700',
+    fontSize: 11,
   },
 });

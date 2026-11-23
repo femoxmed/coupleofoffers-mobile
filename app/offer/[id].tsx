@@ -486,6 +486,19 @@ export default function OfferDetailScreen() {
     }
   };
 
+  const handleAskToPayFromBottomBar = () => {
+    if (!selectedDate || !selectedSlot) {
+      setSelectedSlot(null);
+      setIsBookingModalVisible(true);
+      Alert.alert(
+        'Select Date & Time First',
+        'Choose your date and arrival time so your payment request contains the exact booking details to share.'
+      );
+      return;
+    }
+    void handleAskSomeoneToPay();
+  };
+
   if (!isLoading && !offer) {
     return <DataState message="Unable to load this offer." onRetry={() => { void refetch(); }} />;
   }
@@ -772,41 +785,54 @@ export default function OfferDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Sticky Bottom Booking Bar with Savings & "Book Offer" */}
+      {/* Sticky Bottom Booking Bar with "Ask to pay" and "Book offer" */}
       <View
         style={[
           styles.bottomBar,
           { paddingBottom: Math.max(insets.bottom, 14) },
         ]}
       >
-        <View style={styles.bottomPriceCol}>
-          <View style={styles.bottomPriceRow}>
-            <Text style={styles.bottomPrice}>{formatNaira(calculatedTotalKobo)}</Text>
-            {totalSavingsKobo > 0 && (
-              <View style={styles.bottomSavingsBadge}>
-                <Text style={styles.bottomSavingsBadgeText}>
-                  Save {formatNaira(totalSavingsKobo)}
-                </Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.bottomPriceLabel}>
-            {partySize === basePartySize && allowsMoreThanTwo
-              ? `From ${partySize} Guests • All-Inclusive`
-              : `Total for ${partySize} ${partySize === 1 ? 'Guest' : 'Guests'}`}
-          </Text>
-        </View>
+        <TouchableOpacity
+          onPress={handleAskToPayFromBottomBar}
+          style={styles.bottomAskToPayBtn}
+          activeOpacity={0.82}
+          accessibilityLabel="Ask someone to pay for this offer"
+        >
+          <Share2 size={16} color={Palette.mulberry} />
+          <Text style={styles.bottomAskToPayText}>Ask to pay</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => {
             setSelectedSlot(null);
             setIsBookingModalVisible(true);
           }}
-          style={styles.bookButton}
+          style={styles.bottomBookButton}
           activeOpacity={0.88}
         >
-          <Text style={styles.bookButtonText}>Book Offer</Text>
-          <ArrowRight size={16} color={Palette.porcelain} style={{ marginLeft: 6 }} />
+          <View style={styles.bottomBookContent}>
+            <View style={styles.bottomBookMainRow}>
+              <Text style={styles.bottomBookTitle}>Book offer</Text>
+              <Text style={styles.bottomBookPrice}>{formatNaira(calculatedTotalKobo)}</Text>
+            </View>
+            <View style={styles.bottomBookSubRow}>
+              <Text style={styles.bottomBookParty}>
+                {partySize === 2 ? 'For two' : `${partySize} guests`}
+              </Text>
+              {totalSavingsKobo > 0 ? (
+                <View style={styles.bottomBookSavingsTag}>
+                  <Text style={styles.bottomBookSavingsText}>
+                    Save {formatNaira(totalSavingsKobo)}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.bottomBookSavingsTag}>
+                  <Text style={styles.bottomBookSavingsText}>All-inclusive</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <ArrowRight size={16} color={Palette.porcelain} style={styles.bottomBookArrow} />
         </TouchableOpacity>
       </View>
 
@@ -1326,55 +1352,59 @@ export default function OfferDetailScreen() {
               ]}
             >
               <View style={styles.paymentChoiceLinks}>
-                <TouchableOpacity onPress={handleAskSomeoneToPay} activeOpacity={0.8}>
-                  <Text style={styles.payForMeButtonText}>Ask someone to pay for me</Text>
-                </TouchableOpacity>
                 <TouchableOpacity onPress={handlePayForMe} activeOpacity={0.8}>
-                  <Text style={styles.payForMeButtonText}>Pay for someone</Text>
+                  <Text style={styles.payForMeButtonText}>Pay for someone else</Text>
                 </TouchableOpacity>
               </View>
-              <View style={styles.modalFixedPriceCol}>
-                <View style={styles.bottomPriceRow}>
-                  <Text style={styles.modalFixedPrice}>
-                    {formatNaira(calculatedTotalKobo)}
-                  </Text>
-                  {totalSavingsKobo > 0 && (
-                    <View style={styles.bottomSavingsBadge}>
-                      <Text style={styles.bottomSavingsBadgeText}>
-                        Save {formatNaira(totalSavingsKobo)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.modalFixedPriceSub}>
-                  {partySize === basePartySize && allowsMoreThanTwo
-                    ? `From ${partySize} Guests • All-Inclusive`
-                    : `Total for ${partySize} ${partySize === 1 ? 'Guest' : 'Guests'} • All-Inclusive`}
-                </Text>
-              </View>
+
+              <TouchableOpacity
+                onPress={handleAskSomeoneToPay}
+                style={styles.bottomAskToPayBtn}
+                activeOpacity={0.82}
+                accessibilityLabel="Ask someone to pay for this booking"
+              >
+                <Share2 size={16} color={Palette.mulberry} />
+                <Text style={styles.bottomAskToPayText}>Ask to pay</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleProceedToExternalCheckout}
                 disabled={isSubmitting}
                 style={[
-                  styles.continuePaymentBtn,
+                  styles.bottomBookButton,
                   isSubmitting && { opacity: 0.7 },
-                  (!selectedDate || !selectedSlot) && { opacity: 0.45 },
+                  (!selectedDate || !selectedSlot) && { opacity: 0.55 },
                 ]}
                 activeOpacity={0.88}
               >
-                {isSubmitting ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <BrandLoader size="small" color={Palette.porcelain} />
-                    <Text style={styles.continuePaymentBtnText}>Preparing...</Text>
-                  </View>
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.continuePaymentBtnText}>
-                      {!selectedDate ? 'Select a Date' : !selectedSlot ? 'Select a Time' : 'Checkout'}
+                <View style={styles.bottomBookContent}>
+                  <View style={styles.bottomBookMainRow}>
+                    <Text style={styles.bottomBookTitle}>
+                      {isSubmitting ? 'Preparing...' : !selectedDate ? 'Select Date' : !selectedSlot ? 'Select Time' : 'Checkout'}
                     </Text>
-                    <ArrowRight size={16} color={Palette.porcelain} />
+                    <Text style={styles.bottomBookPrice}>{formatNaira(calculatedTotalKobo)}</Text>
                   </View>
+                  <View style={styles.bottomBookSubRow}>
+                    <Text style={styles.bottomBookParty}>
+                      {partySize === 2 ? 'For two' : `${partySize} guests`}
+                    </Text>
+                    {totalSavingsKobo > 0 ? (
+                      <View style={styles.bottomBookSavingsTag}>
+                        <Text style={styles.bottomBookSavingsText}>
+                          Save {formatNaira(totalSavingsKobo)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.bottomBookSavingsTag}>
+                        <Text style={styles.bottomBookSavingsText}>All-inclusive</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                {isSubmitting ? (
+                  <BrandLoader size="small" color={Palette.porcelain} />
+                ) : (
+                  <ArrowRight size={16} color={Palette.porcelain} style={styles.bottomBookArrow} />
                 )}
               </TouchableOpacity>
             </View>
@@ -1869,17 +1899,97 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.card,
     borderTopWidth: 1,
     borderTopColor: Palette.border,
-    paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingTop: 10,
     paddingBottom: 28,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 12,
+  },
+  bottomAskToPayBtn: {
+    width: 106,
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Palette.mulberry,
+    backgroundColor: Palette.secondaryBg,
+  },
+  bottomAskToPayText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Palette.mulberry,
+  },
+  bottomBookButton: {
+    flex: 1,
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Palette.mulberry,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    shadowColor: Palette.mulberry,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  bottomBookContent: {
+    flex: 1,
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  bottomBookMainRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  bottomBookTitle: {
+    color: Palette.porcelain,
+    fontSize: 13.5,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  bottomBookPrice: {
+    color: Palette.champagne,
+    fontSize: 13.5,
+    fontWeight: '800',
+  },
+  bottomBookSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
+  bottomBookParty: {
+    color: Palette.porcelain,
+    fontSize: 10.5,
+    fontWeight: '600',
+    opacity: 0.92,
+  },
+  bottomBookSavingsTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 5,
+  },
+  bottomBookSavingsText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  bottomBookArrow: {
+    opacity: 0.9,
   },
   bottomPriceCol: {
     flex: 1,
@@ -2276,11 +2386,11 @@ const styles = StyleSheet.create({
   },
   paymentChoiceLinks: {
     position: 'absolute',
-    left: 20,
-    top: -48,
+    left: 16,
+    top: -34,
     zIndex: 2,
     flexDirection: 'row',
-    gap: 18,
+    gap: 16,
   },
   inputHelperText: {
     fontSize: 11,
@@ -2365,12 +2475,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E8DBC6',
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.08,
