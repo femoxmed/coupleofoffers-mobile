@@ -280,6 +280,7 @@ const styles = StyleSheet.create({
   // Compact horizontal card
   compactCard: {
     flexDirection: 'row',
+    height: 134,
     backgroundColor: Palette.card,
     borderRadius: 16,
     borderWidth: 1,
@@ -291,12 +292,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
-    alignItems: 'stretch',
     overflow: 'hidden',
   },
   compactImageWrapper: {
-    width: 124,
-    alignSelf: 'stretch',
+    width: 122,
+    height: 134,
     position: 'relative',
     backgroundColor: Palette.muted,
   },
@@ -347,10 +347,10 @@ const styles = StyleSheet.create({
   },
   compactContent: {
     flex: 1,
-    paddingVertical: 10,
+    height: 134,
+    paddingVertical: 9,
     paddingHorizontal: 12,
     justifyContent: 'space-between',
-    minHeight: 122,
   },
   venueRow: {
     flexDirection: 'row',
