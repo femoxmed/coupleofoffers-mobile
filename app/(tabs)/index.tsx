@@ -1224,8 +1224,8 @@ const styles = StyleSheet.create({
   },
   browseAllBtn: {
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 14,
+    marginBottom: 26,
     paddingVertical: 15,
     borderRadius: 50,
     borderWidth: 1.5,

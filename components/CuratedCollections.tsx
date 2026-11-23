@@ -122,7 +122,8 @@ export function CuratedCollections({ offers }: CuratedCollectionsProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
+    marginTop: 4,
+    marginBottom: 12,
   },
   collectionBlock: {
     marginBottom: 4,
