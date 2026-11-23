@@ -799,8 +799,8 @@ export default function OfferDetailScreen() {
           accessibilityLabel="Ask someone to pay for this offer"
         >
           <Share2 size={15} color={Palette.mulberry} />
-          <Text style={styles.bottomAskToPayText} numberOfLines={2}>
-            Ask someone{'\n'}to pay
+          <Text style={styles.bottomAskToPayText} numberOfLines={1}>
+            Ask someone to pay
           </Text>
         </TouchableOpacity>
 
@@ -1898,7 +1898,7 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   bottomAskToPayBtn: {
-    width: 124,
+    paddingHorizontal: 12,
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1908,14 +1908,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Palette.mulberry,
     backgroundColor: Palette.secondaryBg,
-    paddingHorizontal: 6,
+    flexShrink: 0,
   },
   bottomAskToPayText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
     color: Palette.mulberry,
-    lineHeight: 14,
-    textAlign: 'center',
   },
   bottomBookButton: {
     flex: 1,

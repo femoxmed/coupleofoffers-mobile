@@ -144,16 +144,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     color: Palette.aubergine,
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
   sectionSubtitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: Palette.mutedText,
     marginTop: 1,
-    lineHeight: 16,
+    lineHeight: 15,
   },
   seeAllButton: {
     flexDirection: 'row',
