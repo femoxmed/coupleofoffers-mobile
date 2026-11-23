@@ -62,7 +62,13 @@ interface ExtendedOffer extends Offer {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function OfferDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const routeParams = useLocalSearchParams<{
+    id: string;
+    intent?: string;
+    slotId?: string;
+    partySize?: string;
+  }>();
+  const id = routeParams.id;
   const router = useRouter();
   const toggleSave = useSavedStore((state) => state.toggleSave);
   const isThisOfferSaved = useSavedStore((state) => (id ? state.savedOffers.some((o) => o.id === id) : false));
@@ -77,6 +83,8 @@ export default function OfferDetailScreen() {
   const [bookingMessage, setBookingMessage] = useState('');
   const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
   const [isAskToPayModalVisible, setIsAskToPayModalVisible] = useState(false);
+  const [askRequesterName, setAskRequesterName] = useState(authUser?.name || '');
+  const [askRequesterPhone, setAskRequesterPhone] = useState('');
   const [createdPaymentLink, setCreatedPaymentLink] = useState<string | null>(null);
   const [paymentRequestBusy, setPaymentRequestBusy] = useState(false);
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
@@ -99,6 +107,23 @@ export default function OfferDetailScreen() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+
+  // Auto-resume booking flow when returning from login
+  useEffect(() => {
+    if (routeParams.intent === 'RESUME_BOOKING') {
+      if (routeParams.slotId) setSelectedSlot(routeParams.slotId);
+      if (routeParams.partySize && id) {
+        setPartyChoice({ offerId: id, size: Number(routeParams.partySize) });
+      }
+      setIsBookingModalVisible(true);
+    }
+  }, [routeParams.intent, routeParams.slotId, routeParams.partySize, id]);
+
+  useEffect(() => {
+    if (authUser?.name && !askRequesterName) {
+      setAskRequesterName(authUser.name);
+    }
+  }, [authUser?.name, askRequesterName]);
 
   useEffect(() => {
     if (authUser?.email && !email) {
@@ -510,32 +535,27 @@ export default function OfferDetailScreen() {
       Alert.alert('Select arrival time', 'Choose a date and time first so the request contains the exact booking details.');
       return;
     }
-    if (!authUser?.email) {
-      Alert.alert(
-        'Sign In Required',
-        'Please sign in to create and share a payment request.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sign In',
-            onPress: () => {
-              setIsAskToPayModalVisible(false);
-              router.push('/login');
-            },
-          },
-        ]
-      );
+    const cleanName = (askRequesterName.trim() || authUser?.name || '').trim();
+    if (!cleanName) {
+      Alert.alert('Your Name Required', 'Please enter your name so the recipient knows who created this request.');
       return;
     }
     setPaymentRequestBusy(true);
     try {
-      const request = await checkoutService.createPaymentRequest({ offerId: offer.id, slotId: selectedSlot, partySize });
+      const request = await checkoutService.createPaymentRequest({
+        offerId: offer.id,
+        slotId: selectedSlot,
+        partySize,
+        requesterName: cleanName,
+        requesterPhone: askRequesterPhone.trim() || undefined,
+        requesterEmail: authUser?.email || undefined,
+      });
       const link = `https://coupleofoffers.com/pay-for?token=${encodeURIComponent(request.token)}`;
       setCreatedPaymentLink(link);
       const formattedDate = new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' });
       await Share.share({
         title: `Payment request for ${offer.title}`,
-        message: `I found an experience I’d love to share with you. Could you help cover this booking? This request is for ${offer.title} at ${offer.venue_name || offer.venue}, on ${formattedDate}, for ${partySize} ${partySize === 1 ? 'guest' : 'guests'}. It expires in 7 days:\n\n${link}`,
+        message: `Hi! I found an experience I'd love to share with you. Could you help cover this booking? This request is for ${offer.title} at ${cleanVenueName}, on ${formattedDate}, for ${partySize} ${partySize === 1 ? 'guest' : 'guests'}. Here is the link:\n\n${link}`,
       });
     } catch (error) {
       Alert.alert('Could not create payment request', error instanceof Error ? error.message : 'Please try again.');
@@ -1335,6 +1355,27 @@ export default function OfferDetailScreen() {
                       <Text style={styles.verifiedBadgeText}>Verified Account</Text>
                     </View>
                   )}
+                  {!payForSomeone && !authUser?.email && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setIsBookingModalVisible(false);
+                        router.push({
+                          pathname: '/login',
+                          params: {
+                            returnTo: `/offer/${id}`,
+                            intent: 'RESUME_BOOKING',
+                            slotId: selectedSlot || '',
+                            partySize: String(partySize),
+                          },
+                        });
+                      }}
+                      hitSlop={6}
+                    >
+                      <Text style={{ fontSize: 11.5, color: Palette.mulberry, fontWeight: '700' }}>
+                        Sign in
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <View
                   style={[
@@ -1903,6 +1944,33 @@ export default function OfferDetailScreen() {
                     )}
                   </View>
                 )}
+              </View>
+
+              {/* Requester Details for the Payment Recipient */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionLabel}>Your Details (For the recipient)</Text>
+                <View style={{ marginTop: 4 }}>
+                  <Text style={styles.payerInputLabel}>Your Name *</Text>
+                  <TextInput
+                    style={styles.emailInput}
+                    placeholder="e.g. Bolanle"
+                    placeholderTextColor={Palette.mutedText}
+                    value={askRequesterName}
+                    onChangeText={setAskRequesterName}
+                    autoCapitalize="words"
+                  />
+                </View>
+                <View style={{ marginTop: 10 }}>
+                  <Text style={styles.payerInputLabel}>WhatsApp / Phone <Text style={{ fontWeight: '400', color: Palette.mutedText }}>(optional)</Text></Text>
+                  <TextInput
+                    style={styles.emailInput}
+                    placeholder="+234 800 000 0000"
+                    placeholderTextColor={Palette.mutedText}
+                    value={askRequesterPhone}
+                    onChangeText={setAskRequesterPhone}
+                    keyboardType="phone-pad"
+                  />
+                </View>
               </View>
 
               {/* Ready Link preview */}

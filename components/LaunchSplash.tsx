@@ -9,9 +9,9 @@ export function LaunchSplash({ onFinish }: { onFinish: () => void }) {
   const reveal = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     const animation = Animated.sequence([
-      Animated.timing(reveal, { toValue: 1, duration: 850, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.delay(2250),
-      Animated.timing(opacity, { toValue: 0, duration: 450, useNativeDriver: true }),
+      Animated.timing(reveal, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.delay(650),
+      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]);
     animation.start(({ finished }) => { if (finished) onFinish(); });
     return () => animation.stop();

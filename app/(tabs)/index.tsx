@@ -50,6 +50,8 @@ import {
 } from '../../components/ThemedSearchBar';
 import { useLocationStore} from '../../store/useLocationStore';
 import { LocationPickerModal } from '../../components/LocationPickerModal';
+import { FirstRunLocationSheet, hasCompletedFirstRun } from '../../components/FirstRunLocationSheet';
+import { TrustPropositionBanner } from '../../components/TrustPropositionBanner';
 import { useSearchStore } from '../../store/useSearchStore';
 import { getOfferDistanceBadge } from '../../utils/distance';
 import type { Offer, Partner, HomepageSlide } from '../../types';
@@ -73,7 +75,24 @@ export default function HomeScreen() {
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isFirstRunSheetOpen, setIsFirstRunSheetOpen] = useState(false);
   const [savedModalTab, setSavedModalTab] = useState<'offers' | 'alerts'>('offers');
+
+  // Check first-run experience on initial launch
+  useEffect(() => {
+    let isMounted = true;
+    hasCompletedFirstRun().then((completed) => {
+      if (!completed && isMounted) {
+        const timer = setTimeout(() => {
+          if (isMounted) setIsFirstRunSheetOpen(true);
+        }, 750);
+        return () => clearTimeout(timer);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Load saved location on startup
   useEffect(() => {
@@ -336,6 +355,9 @@ export default function HomeScreen() {
             onActionPress={() => router.push('/(tabs)/explore')}
           />
         ) : null}
+
+        {/* 2.5 Trust & Value Proposition Pillars */}
+        <TrustPropositionBanner />
 
         {/* 3. Categories Nav (Matching Web App Homepage - with category image & icon) */}
         <TopCategoryNav
@@ -925,6 +947,14 @@ export default function HomeScreen() {
             setFilters((prev) => ({ ...prev, area: loc.name }));
           }
         }}
+      />
+
+      {/* ========================================================= */}
+      {/* 5. FIRST-RUN LUXURY NEIGHBORHOOD WELCOME SHEET            */}
+      {/* ========================================================= */}
+      <FirstRunLocationSheet
+        visible={isFirstRunSheetOpen}
+        onDismiss={() => setIsFirstRunSheetOpen(false)}
       />
     </SafeAreaView>
   );

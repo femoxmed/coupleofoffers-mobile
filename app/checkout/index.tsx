@@ -125,8 +125,27 @@ export default function MobileBachsCheckoutScreen() {
         Alert.alert('Payment awaiting confirmation', 'Your payment has not been confirmed yet. Check your bookings again shortly.');
         return;
       }
-      setArrivalPin(receipt.arrivalCode || '');
+      const arrivalCode = receipt.arrivalCode || '';
+      setArrivalPin(arrivalCode);
       setPaymentSuccess(true);
+
+      // Persist to local device storage so guest user can always access voucher
+      void checkoutService.saveGuestBooking({
+        id: reference,
+        reference,
+        offerId: params.offerId || '',
+        offerTitle: params.offerTitle || 'Date Package',
+        venueName: params.venueName || 'Partner Venue',
+        venueAddress: params.venueAddress,
+        partySize,
+        amountKobo,
+        email: userEmail,
+        slotTime: params.slotTime || 'Reserved Slot',
+        arrivalPin: arrivalCode,
+        createdAt: new Date().toISOString(),
+        status: 'confirmed',
+        isGuest: !authUser,
+      });
     } catch (err) {
       Alert.alert('Could not verify payment', err instanceof Error ? err.message : 'Please check your bookings.');
     }

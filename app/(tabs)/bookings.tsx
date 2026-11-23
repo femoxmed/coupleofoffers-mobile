@@ -107,7 +107,10 @@ export default function BookingsScreen() {
 
   const loadBookings = useCallback(async () => {
     if (!user) {
-      setBookings([]);
+      // Check for locally held guest bookings on this device
+      const guestItems = await checkoutService.getGuestBookings();
+      setBookings(guestItems);
+      setBookingsError(false);
       return;
     }
     setBookingsError(false);
@@ -214,8 +217,8 @@ export default function BookingsScreen() {
     return bookingFilter === 'others' ? isOther : !isOther;
   });
 
-  // 1. UNLOGGED IN: Prompt User to Sign In (Optically centered above floating nav)
-  if (!user) {
+  // 1. UNLOGGED IN & NO LOCAL GUEST PASSES: Prompt User to Sign In
+  if (!user && bookings.length === 0) {
     return (
       <SafeAreaView style={styles.unauthContainer} edges={['top']}>
         <View style={styles.unauthContent}>
@@ -230,7 +233,7 @@ export default function BookingsScreen() {
 
           <TouchableOpacity
             style={styles.signInPrimaryBtn}
-            onPress={() => router.push('/login')}
+            onPress={() => router.push({ pathname: '/login', params: { returnTo: '/(tabs)/bookings' } })}
             activeOpacity={0.88}
           >
             <LogIn size={16} color={Palette.porcelain} style={{ marginRight: 6 }} />
@@ -239,7 +242,7 @@ export default function BookingsScreen() {
 
           <TouchableOpacity
             style={styles.signUpSecondaryBtn}
-            onPress={() => router.push('/signup')}
+            onPress={() => router.push({ pathname: '/signup', params: { returnTo: '/(tabs)/bookings' } })}
             activeOpacity={0.75}
           >
             <UserPlus size={15} color={Palette.mulberry} style={{ marginRight: 6 }} />
@@ -252,6 +255,27 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Reassurance Banner for Guest Users Viewing Device Passes */}
+      {!user && (
+        <View style={styles.guestPassBanner}>
+          <View style={styles.guestPassIconWrap}>
+            <Ticket size={16} color={Palette.goldInk} />
+          </View>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={styles.guestPassTitle}>Device Passes Active</Text>
+            <Text style={styles.guestPassSubtitle}>
+              These passes are saved on this phone. Sign in to back up and view on any device.
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.guestPassActionBtn}
+            onPress={() => router.push({ pathname: '/login', params: { returnTo: '/(tabs)/bookings' } })}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.guestPassActionText}>Back up</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {/* Top Header Row with Help & Concierge Pill */}
       <View style={styles.headerBar}>
         <View style={{ flex: 1 }}>
@@ -979,8 +1003,8 @@ export default function BookingsScreen() {
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
         initialBookingRef={helpBookingRef}
-        userEmail={user.email}
-        userName={user.name}
+        userEmail={user?.email || ''}
+        userName={user?.name || undefined}
       />
     </SafeAreaView>
   );
@@ -3017,5 +3041,52 @@ const styles = StyleSheet.create({
     color: Palette.porcelain,
     fontSize: 14,
     fontWeight: '700',
+  },
+  guestPassBanner: {
+    marginHorizontal: 16,
+    marginVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF5ED',
+    borderWidth: 1,
+    borderColor: '#E5C99A80',
+    borderRadius: 14,
+    padding: 12,
+    shadowColor: Palette.aubergine,
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  guestPassIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F3ECE2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  guestPassTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Palette.aubergine,
+  },
+  guestPassSubtitle: {
+    fontSize: 11,
+    color: Palette.mutedText,
+    lineHeight: 14,
+    marginTop: 2,
+  },
+  guestPassActionBtn: {
+    backgroundColor: Palette.aubergine,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  guestPassActionText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: Palette.porcelain,
   },
 });

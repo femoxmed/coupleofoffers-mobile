@@ -12,6 +12,7 @@ function loadService(file, apiClient, storage = {}, globals = {}) {
   vm.runInNewContext(js,{exports,console,URL,Date,Math,AbortController,setTimeout,clearTimeout,...globals,require(name){
     if (name==='./apiClient') return {apiClient,...storage};
     if (name==='expo-secure-store') return {setItemAsync:async()=>{},deleteItemAsync:async()=>{},...storage};
+    if (name==='@react-native-async-storage/async-storage') return {default:{getItem:async()=>null,setItem:async()=>{},removeItem:async()=>{}},getItem:async()=>null,setItem:async()=>{},removeItem:async()=>{},...storage};
     if (name==='../constants/config') return {Config:{},resolveImageUrl:value=>value};
     throw new Error('Unexpected import: '+name);
   }});

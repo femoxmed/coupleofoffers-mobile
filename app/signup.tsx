@@ -10,7 +10,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Mail,
@@ -30,6 +30,13 @@ import { useAuthStore } from '../store/useAuthStore';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    returnTo?: string;
+    intent?: string;
+    offerId?: string;
+    slotId?: string;
+    partySize?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const { signup, isLoading } = useAuthStore();
 
@@ -74,7 +81,17 @@ export default function SignupScreen() {
         trimmedName
       );
 
-      if (router.canGoBack()) {
+      if (params.returnTo) {
+        router.replace({
+          pathname: params.returnTo as any,
+          params: {
+            intent: params.intent,
+            slotId: params.slotId,
+            partySize: params.partySize,
+            offerId: params.offerId,
+          },
+        });
+      } else if (router.canGoBack()) {
         router.back();
       } else {
         router.replace('/(tabs)/profile');
@@ -267,7 +284,7 @@ export default function SignupScreen() {
               if (router.canGoBack()) {
                 router.back();
               } else {
-                router.replace('/login');
+                router.replace({ pathname: '/login', params });
               }
             }}
             activeOpacity={0.7}

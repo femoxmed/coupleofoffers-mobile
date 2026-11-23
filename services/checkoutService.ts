@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './apiClient';
 
 export interface CheckoutInitParams {
@@ -87,10 +88,23 @@ function getUserStorageKey(email?: string | null): string {
 }
 
 export const checkoutService = {
-  async createPaymentRequest(params: { offerId: string; slotId: string; partySize: number }): Promise<PaymentRequestResult> {
+  async createPaymentRequest(params: {
+    offerId: string;
+    slotId: string;
+    partySize: number;
+    requesterName?: string;
+    requesterPhone?: string;
+    requesterEmail?: string;
+  }): Promise<PaymentRequestResult> {
     return apiClient<PaymentRequestResult>(`/api/v1/offers/${encodeURIComponent(params.offerId)}/payment-requests`, {
       method: 'POST',
-      body: JSON.stringify({ slotId: params.slotId, partySize: params.partySize }),
+      body: JSON.stringify({
+        slotId: params.slotId,
+        partySize: params.partySize,
+        requesterName: params.requesterName,
+        requesterPhone: params.requesterPhone,
+        requesterEmail: params.requesterEmail,
+      }),
     });
   },
 
@@ -124,6 +138,47 @@ export const checkoutService = {
 
   async verifyBooking(reference: string): Promise<{ status: string; arrivalCode?: string | null }> {
     return apiClient(`/api/v1/offers/bookings/${encodeURIComponent(reference)}`);
+  },
+
+  /**
+   * Save confirmed guest booking to local device storage
+   */
+  async saveGuestBooking(booking: ConfirmedBooking): Promise<void> {
+    try {
+      const existing = await this.getGuestBookings();
+      const deduped = [booking, ...existing.filter((b) => b.reference !== booking.reference)];
+      const json = JSON.stringify(deduped);
+      try {
+        await SecureStore.setItemAsync('coo_mobile_bookings_guest', json);
+      } catch {}
+      try {
+        await AsyncStorage.setItem('coo_mobile_bookings_guest', json);
+      } catch {}
+    } catch (e) {
+      console.warn('Could not save guest booking to device:', e);
+    }
+  },
+
+  /**
+   * Retrieve confirmed guest bookings saved locally on this device
+   */
+  async getGuestBookings(): Promise<ConfirmedBooking[]> {
+    try {
+      let raw: string | null = null;
+      try {
+        raw = await SecureStore.getItemAsync('coo_mobile_bookings_guest');
+      } catch {}
+      if (!raw) {
+        try {
+          raw = await AsyncStorage.getItem('coo_mobile_bookings_guest');
+        } catch {}
+      }
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   },
 
   /**
