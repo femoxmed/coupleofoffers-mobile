@@ -41,6 +41,8 @@ import { HeroCarousel } from '../../components/HeroCarousel';
 import { TopCategoryNav, WEB_HOMEPAGE_CATEGORIES } from '../../components/TopCategoryNav';
 import { PartnerCard } from '../../components/PartnerCard';
 import { OfferCard } from '../../components/OfferCard';
+import { NearYouSection } from '../../components/NearYouSection';
+import { CuratedCollections } from '../../components/CuratedCollections';
 import {
   ThemedSearchBar,
   FilterState,
@@ -348,38 +350,10 @@ export default function HomeScreen() {
 
         {slidesError && <DataState message="Unable to load homepage slides." onRetry={() => { void refetchSlides(); }} />}
 
-        {/* 4. Featured Partners Section */}
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionHeading}>
-            <View style={styles.titleBadgeRow}>
-              <Store size={14} color={Palette.mulberry} style={{ marginRight: 5 }} />
-              <Text style={styles.sectionTitle}>Featured Partners</Text>
-            </View>
-            <Text style={styles.sectionSubtitle}>
-              Curated dining rooms, lounges, and experiential venues
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.seeAllButton}
-            onPress={() => router.push('/(tabs)/partners')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.seeAllText}>See All</Text>
-            <ChevronRight size={14} color={Palette.mulberry} />
-          </TouchableOpacity>
-        </View>
-
-        {(partnersLoading || partnersError || partners?.length === 0) && (
-          <DataState loading={partnersLoading} message={partnersLoading ? 'Loading partners...' : partnersError ? 'Unable to load partners.' : 'No partners available yet.'} onRetry={partnersError ? () => { void refetchPartners(); } : undefined} />
-        )}
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={partners || []}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <PartnerCard partner={item} width={260} />}
-          contentContainerStyle={styles.partnersList}
+        {/* 4. Offers Near You Section (Physical Distance Calculation & Live Badges) */}
+        <NearYouSection
+          offers={offers || []}
+          onOpenLocationPicker={() => setIsLocationModalOpen(true)}
         />
 
         {/* 5. Signature Date Experiences (Compact Layout) */}
@@ -428,6 +402,43 @@ export default function HomeScreen() {
         >
           <Text style={styles.browseAllBtnText}>Browse all experiences →</Text>
         </TouchableOpacity>
+
+        {/* 6. Curated Collections (Under ₦50,000 & Bring Your Friends) */}
+        <CuratedCollections offers={offers || []} />
+
+        {/* 7. Featured Partners Section */}
+        <View style={[styles.sectionHeaderRow, { marginTop: 28 }]}>
+          <View style={styles.sectionHeading}>
+            <View style={styles.titleBadgeRow}>
+              <Store size={14} color={Palette.mulberry} style={{ marginRight: 5 }} />
+              <Text style={styles.sectionTitle}>Featured Partners</Text>
+            </View>
+            <Text style={styles.sectionSubtitle}>
+              Curated dining rooms, lounges, and experiential venues
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.seeAllButton}
+            onPress={() => router.push('/(tabs)/partners')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.seeAllText}>See All</Text>
+            <ChevronRight size={14} color={Palette.mulberry} />
+          </TouchableOpacity>
+        </View>
+
+        {(partnersLoading || partnersError || partners?.length === 0) && (
+          <DataState loading={partnersLoading} message={partnersLoading ? 'Loading partners...' : partnersError ? 'Unable to load partners.' : 'No partners available yet.'} onRetry={partnersError ? () => { void refetchPartners(); } : undefined} />
+        )}
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={partners || []}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <PartnerCard partner={item} width={260} />}
+          contentContainerStyle={styles.partnersList}
+        />
 
         {/* 6. Destination for Curated Experiences & Marketplace Categories */}
         <View style={styles.categoriesSection}>

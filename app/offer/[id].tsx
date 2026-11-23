@@ -798,8 +798,10 @@ export default function OfferDetailScreen() {
           activeOpacity={0.82}
           accessibilityLabel="Ask someone to pay for this offer"
         >
-          <Share2 size={16} color={Palette.mulberry} />
-          <Text style={styles.bottomAskToPayText}>Ask to pay</Text>
+          <Share2 size={15} color={Palette.mulberry} />
+          <Text style={styles.bottomAskToPayText} numberOfLines={2}>
+            Ask someone{'\n'}to pay
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1351,27 +1353,11 @@ export default function OfferDetailScreen() {
                 { paddingBottom: Math.max(insets.bottom, 14) },
               ]}
             >
-              <View style={styles.paymentChoiceLinks}>
-                <TouchableOpacity onPress={handlePayForMe} activeOpacity={0.8}>
-                  <Text style={styles.payForMeButtonText}>Pay for someone else</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                onPress={handleAskSomeoneToPay}
-                style={styles.bottomAskToPayBtn}
-                activeOpacity={0.82}
-                accessibilityLabel="Ask someone to pay for this booking"
-              >
-                <Share2 size={16} color={Palette.mulberry} />
-                <Text style={styles.bottomAskToPayText}>Ask to pay</Text>
-              </TouchableOpacity>
-
               <TouchableOpacity
                 onPress={handleProceedToExternalCheckout}
                 disabled={isSubmitting}
                 style={[
-                  styles.bottomBookButton,
+                  styles.modalContinueButton,
                   isSubmitting && { opacity: 0.7 },
                   (!selectedDate || !selectedSlot) && { opacity: 0.55 },
                 ]}
@@ -1912,21 +1898,24 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   bottomAskToPayBtn: {
-    width: 106,
+    width: 124,
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 6,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: Palette.mulberry,
     backgroundColor: Palette.secondaryBg,
+    paddingHorizontal: 6,
   },
   bottomAskToPayText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: Palette.mulberry,
+    lineHeight: 14,
+    textAlign: 'center',
   },
   bottomBookButton: {
     flex: 1,
@@ -2475,17 +2464,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E8DBC6',
-    paddingHorizontal: 14,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 8,
-    position: 'relative',
+  },
+  modalContinueButton: {
+    flex: 1,
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Palette.mulberry,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    shadowColor: Palette.mulberry,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   modalFixedPriceCol: {
     flex: 1,
