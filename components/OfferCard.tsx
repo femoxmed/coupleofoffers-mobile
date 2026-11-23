@@ -12,9 +12,10 @@ import type { Offer } from '../types';
 interface OfferCardProps {
   offer: Offer;
   layout?: 'compact' | 'featured';
+  distanceBadge?: string;
 }
 
-export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
+export function OfferCard({ offer, layout = 'compact', distanceBadge }: OfferCardProps) {
   const router = useRouter();
   const toggleSave = useSavedStore((state) => state.toggleSave);
   const saved = useSavedStore((state) => state.savedOffers.some((o) => o.id === offer.id));
@@ -68,6 +69,12 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
         {/* Left: 110x110 Image */}
         <View style={styles.compactImageWrapper}>
           <CatalogImage url={offer.image_url} category={offer.category} style={styles.compactImage} />
+          {distanceBadge ? (
+            <View style={styles.compactDistanceBadge}>
+              <MapPin size={9} color="#FFFCF7" style={{ marginRight: 2 }} />
+              <Text style={styles.compactDistanceBadgeText}>{distanceBadge}</Text>
+            </View>
+          ) : null}
           <Pressable
             hitSlop={8}
             onPress={handleHeartPress}
@@ -137,6 +144,12 @@ export function OfferCard({ offer, layout = 'compact' }: OfferCardProps) {
         <CatalogImage url={offer.image_url} category={offer.category} style={styles.featuredImage} />
         <View style={styles.badgeRow}>
           <View style={styles.leftBadges}>
+            {distanceBadge ? (
+              <View style={styles.featuredDistanceBadge}>
+                <MapPin size={10} color="#FFFCF7" style={{ marginRight: 3 }} />
+                <Text style={styles.featuredDistanceBadgeText}>{distanceBadge}</Text>
+              </View>
+            ) : null}
             {offer.homepage_featured && (
               <View style={styles.featuredBadge}>
                 <Text style={styles.featuredBadgeText}>FEATURED</Text>
@@ -235,6 +248,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 252, 247, 0.92)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  compactDistanceBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: 'rgba(48, 29, 50, 0.82)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactDistanceBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFFCF7',
   },
   compactPartyBadge: {
     position: 'absolute',
@@ -351,6 +380,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  featuredDistanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(48, 29, 50, 0.85)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  featuredDistanceBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFCF7',
   },
   featuredBadge: {
     flexDirection: 'row',

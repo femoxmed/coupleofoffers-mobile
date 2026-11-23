@@ -21,21 +21,28 @@ import {
 } from '../../components/ThemedSearchBar';
 import type { Offer } from '../../types';
 import { useSearchStore } from '../../store/useSearchStore';
+import { useLocationStore } from '../../store/useLocationStore';
+import { getOfferDistanceBadge } from '../../utils/distance';
 
 export default function ExploreScreen() {
   const params = useLocalSearchParams<{
     q?: string;
     category?: string;
     area?: string;
+    state?: string;
+    city?: string;
     partySize?: string;
     priceRange?: string;
   }>();
 
+  const { currentLocation } = useLocationStore();
   const searchQuery = useSearchStore((s) => s.query);
   const setSearchQuery = useSearchStore((s) => s.setQuery);
   const [filters, setFilters] = useState<FilterState>({
     category: params.category || 'all',
-    area: params.area || 'all',
+    area: params.area || params.city || 'all',
+    state: params.state || 'all',
+    city: params.city || 'all',
     partySize: params.partySize || 'all',
     priceRange: params.priceRange || 'all',
   });
@@ -51,10 +58,17 @@ export default function ExploreScreen() {
       );
       setFilters((prev) => ({ ...prev, category: match ? match.id : params.category || 'all' }));
     }
-    if (params.area !== undefined) {
-      setFilters((prev) => ({ ...prev, area: params.area || 'all' }));
+    if (params.area !== undefined || params.city !== undefined) {
+      setFilters((prev) => ({
+        ...prev,
+        area: params.area || params.city || 'all',
+        city: params.city || params.area || 'all',
+      }));
     }
-  }, [params.q, params.category, params.area]);
+    if (params.state !== undefined) {
+      setFilters((prev) => ({ ...prev, state: params.state || 'all' }));
+    }
+  }, [params.q, params.category, params.area, params.state, params.city]);
 
   const { data: offers, isLoading, isRefetching, isError, refetch } = useQuery<Offer[]>({
     queryKey: ['offers'],
@@ -65,16 +79,18 @@ export default function ExploreScreen() {
   const availableAreas = useMemo(() => {
     const set = new Set<string>();
     offers?.forEach((o) => {
+      if (o.city) set.add(o.city.trim());
       const a = (o.street_address || o.venue || '')
         .replace(/,\s*Lagos/gi, '')
         .replace(/Lagos/gi, '')
-          .trim();
+        .replace(/,\s*Nigeria/gi, '')
+        .trim();
       if (a) {
         const primary = a.split(',')[0].trim();
-        if (primary) set.add(primary);
+        if (primary && !/demo/i.test(primary)) set.add(primary);
       }
     });
-    return ['All Areas', ...Array.from(set)];
+    return ['All Areas', ...Array.from(set).sort()];
   }, [offers]);
 
   const filteredOffers = useMemo(() => {
@@ -87,6 +103,8 @@ export default function ExploreScreen() {
         offer.title.toLowerCase().includes(query) ||
         offer.venue_name?.toLowerCase().includes(query) ||
         offer.street_address?.toLowerCase().includes(query) ||
+        offer.city?.toLowerCase().includes(query) ||
+        offer.state?.toLowerCase().includes(query) ||
         offer.category.toLowerCase().includes(query);
 
       // 2. Category Filter
@@ -98,11 +116,37 @@ export default function ExploreScreen() {
           (cat === 'dining' && offer.category.toLowerCase().includes('dinner'));
       }
 
-      // 3. Area Filter
-      let matchesArea = true;
-      if (filters.area !== 'all' && filters.area !== 'All Areas') {
+      // 3. Location Filter (State & City / Area)
+      let matchesLocation = true;
+      if (filters.state && filters.state !== 'all') {
+        const offerState = (offer.state || '').toLowerCase();
+        const targetState = filters.state.toLowerCase();
+        matchesLocation =
+          offerState === targetState ||
+          (targetState.includes('lagos') && !offer.state);
+      }
+      if (
+        matchesLocation &&
+        filters.city &&
+        filters.city !== 'all' &&
+        filters.city !== 'All Areas' &&
+        filters.city !== 'All Locations'
+      ) {
+        const targetCity = filters.city.toLowerCase();
+        const offerCity = (offer.city || '').toLowerCase();
         const addr = (offer.street_address || offer.venue || '').toLowerCase();
-        matchesArea = addr.includes(filters.area.toLowerCase());
+        matchesLocation = offerCity.includes(targetCity) || addr.includes(targetCity);
+      } else if (
+        matchesLocation &&
+        filters.area &&
+        filters.area !== 'all' &&
+        filters.area !== 'All Areas' &&
+        filters.area !== 'All Locations'
+      ) {
+        const targetArea = filters.area.toLowerCase();
+        const offerCity = (offer.city || '').toLowerCase();
+        const addr = (offer.street_address || offer.venue || '').toLowerCase();
+        matchesLocation = offerCity.includes(targetArea) || addr.includes(targetArea);
       }
 
       // 4. Party Size Filter
@@ -126,7 +170,7 @@ export default function ExploreScreen() {
         matchesPrice = kobo > 20000000;
       }
 
-      return matchesSearch && matchesCategory && matchesArea && matchesParty && matchesPrice;
+      return matchesSearch && matchesCategory && matchesLocation && matchesParty && matchesPrice;
     });
   }, [offers, searchQuery, filters]);
 
@@ -135,7 +179,17 @@ export default function ExploreScreen() {
       <BrandRefreshFlatList
         data={filteredOffers}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <OfferCard offer={item} layout="compact" />}
+        renderItem={({ item }) => (
+          <OfferCard
+            offer={item}
+            layout="compact"
+            distanceBadge={getOfferDistanceBadge(
+              item,
+              currentLocation?.latitude,
+              currentLocation?.longitude
+            )}
+          />
+        )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshing={isRefetching}

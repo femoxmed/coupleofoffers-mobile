@@ -29,9 +29,14 @@ export type Offer = {
   venue_slug?: string;
   venue_banner_url?: string | null;
   street_address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   arrival_notes?: string | null;
   days_available?: string | null;
   time_window?: string | null;
+  expires_at?: string | null;
   homepage_featured?: boolean;
   featured_at?: string | null;
   branches?: OfferBranch[] | null;

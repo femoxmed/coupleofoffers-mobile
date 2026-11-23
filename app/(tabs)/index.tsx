@@ -49,6 +49,7 @@ import {
 import { useLocationStore} from '../../store/useLocationStore';
 import { LocationPickerModal } from '../../components/LocationPickerModal';
 import { useSearchStore } from '../../store/useSearchStore';
+import { getOfferDistanceBadge } from '../../utils/distance';
 import type { Offer, Partner, HomepageSlide } from '../../types';
 
 function searchGuestLabel(offer: Offer) {
@@ -171,6 +172,8 @@ export default function HomeScreen() {
         q: searchQuery.trim() || undefined,
         category: filters.category !== 'all' ? filters.category : undefined,
         area: filters.area !== 'all' && filters.area !== 'All Areas' && filters.area !== 'All Locations' ? filters.area : undefined,
+        state: filters.state && filters.state !== 'all' ? filters.state : undefined,
+        city: filters.city && filters.city !== 'all' && filters.city !== 'All Areas' && filters.city !== 'All Locations' ? filters.city : undefined,
         partySize: filters.partySize !== 'all' ? filters.partySize : undefined,
         priceRange: filters.priceRange !== 'all' ? filters.priceRange : undefined,
       },
@@ -185,6 +188,8 @@ export default function HomeScreen() {
         q: searchQuery.trim() || undefined,
         category: newFilters.category !== 'all' ? newFilters.category : undefined,
         area: newFilters.area !== 'all' && newFilters.area !== 'All Areas' && newFilters.area !== 'All Locations' ? newFilters.area : undefined,
+        state: newFilters.state && newFilters.state !== 'all' ? newFilters.state : undefined,
+        city: newFilters.city && newFilters.city !== 'all' && newFilters.city !== 'All Areas' && newFilters.city !== 'All Locations' ? newFilters.city : undefined,
         partySize: newFilters.partySize !== 'all' ? newFilters.partySize : undefined,
         priceRange: newFilters.priceRange !== 'all' ? newFilters.priceRange : undefined,
       },
@@ -200,6 +205,7 @@ export default function HomeScreen() {
   const availableLocations = useMemo(() => {
     const locations = new Set<string>();
     (offers || []).forEach((offer) => {
+      if (offer.city) locations.add(offer.city.trim());
       const value = (offer.street_address || offer.venue || '').split(',')[0]?.trim();
       if (value && !/demo/i.test(value)) locations.add(value);
     });
@@ -402,7 +408,16 @@ export default function HomeScreen() {
         )}
         <View style={styles.offersCompactList}>
           {featuredOffers.map((offer) => (
-            <OfferCard key={offer.id} offer={offer} layout="compact" />
+            <OfferCard
+              key={offer.id}
+              offer={offer}
+              layout="compact"
+              distanceBadge={getOfferDistanceBadge(
+                offer,
+                currentLocation?.latitude,
+                currentLocation?.longitude
+              )}
+            />
           ))}
         </View>
 

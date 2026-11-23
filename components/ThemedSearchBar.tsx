@@ -19,12 +19,15 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 import { Palette } from '../constants/Colors';
+import { NIGERIAN_STATES, getCitiesForState } from '../constants/nigerian-locations';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export interface FilterState {
   category: string;
   area: string;
+  state?: string;
+  city?: string;
   partySize: string; // 'all' | '1' | '2' | 'group'
   priceRange: string; // 'all' | 'under-50k' | '50k-100k' | '100k-200k' | 'above-200k'
 }
@@ -32,6 +35,8 @@ export interface FilterState {
 export const DEFAULT_FILTERS: FilterState = {
   category: 'all',
   area: 'all',
+  state: 'all',
+  city: 'all',
   partySize: 'all',
   priceRange: 'all',
 };
@@ -95,7 +100,10 @@ export function ThemedSearchBar({
 }: ThemedSearchBarProps) {
   // Count active filters (excluding 'all')
   const activeCount = Object.entries(filters).filter(
-    ([_, val]) => val !== 'all' && val !== 'All Areas' && val !== 'All Locations'
+    ([key, val]) => {
+      if (key === 'area' && ((filters.city && filters.city !== 'all') || (filters.state && filters.state !== 'all'))) return false;
+      return val && val !== 'all' && val !== 'All Areas' && val !== 'All Locations';
+    }
   ).length;
 
   // The pills only show when user clicks the filter icon (or if active filters already exist)
@@ -108,6 +116,8 @@ export function ThemedSearchBar({
 
   // Temporary selection while modal is open
   const [tempValue, setTempValue] = useState<string>('');
+  const [tempStateValue, setTempStateValue] = useState<string>('all');
+  const [tempCityValue, setTempCityValue] = useState<string>('all');
 
   const togglePills = () => {
     setPillsExpanded((prev) => !prev);
@@ -116,7 +126,10 @@ export function ThemedSearchBar({
   const openFilterModal = (type: ModalFilterType) => {
     if (!type) return;
     if (type === 'category') setTempValue(filters.category);
-    else if (type === 'area') setTempValue(filters.area);
+    else if (type === 'area') {
+      setTempStateValue(filters.state || 'all');
+      setTempCityValue(filters.city || (filters.area !== 'all' && filters.area !== 'All Areas' ? filters.area : 'all'));
+    }
     else if (type === 'budget') setTempValue(filters.priceRange);
     else if (type === 'party') setTempValue(filters.partySize);
     setActiveModalType(type);
@@ -126,7 +139,11 @@ export function ThemedSearchBar({
     if (!activeModalType) return;
     const updated: FilterState = { ...filters };
     if (activeModalType === 'category') updated.category = tempValue;
-    else if (activeModalType === 'area') updated.area = tempValue;
+    else if (activeModalType === 'area') {
+      updated.state = tempStateValue;
+      updated.city = tempCityValue;
+      updated.area = tempCityValue !== 'all' ? tempCityValue : (tempStateValue !== 'all' ? tempStateValue : 'all');
+    }
     else if (activeModalType === 'budget') updated.priceRange = tempValue;
     else if (activeModalType === 'party') updated.partySize = tempValue;
 
@@ -138,7 +155,13 @@ export function ThemedSearchBar({
     if (!activeModalType) return;
     const updated: FilterState = { ...filters };
     if (activeModalType === 'category') updated.category = 'all';
-    else if (activeModalType === 'area') updated.area = 'all';
+    else if (activeModalType === 'area') {
+      updated.state = 'all';
+      updated.city = 'all';
+      updated.area = 'all';
+      setTempStateValue('all');
+      setTempCityValue('all');
+    }
     else if (activeModalType === 'budget') updated.priceRange = 'all';
     else if (activeModalType === 'party') updated.partySize = 'all';
 
@@ -148,7 +171,9 @@ export function ThemedSearchBar({
   };
 
   const handleResetAll = () => {
-    const reset = { ...DEFAULT_FILTERS, area: 'all' };
+    const reset: FilterState = { ...DEFAULT_FILTERS, state: 'all', city: 'all', area: 'all' };
+    setTempStateValue('all');
+    setTempCityValue('all');
     onApplyFilters?.(reset);
   };
 
@@ -156,7 +181,13 @@ export function ThemedSearchBar({
   const categoryLabel =
     CATEGORY_OPTIONS.find((c) => c.id === filters.category)?.label || 'Category';
   const areaLabel =
-    filters.area !== 'all' && filters.area !== 'All Areas' && filters.area !== 'All Locations' ? filters.area : 'Location';
+    filters.city && filters.city !== 'all' && filters.city !== 'All Areas' && filters.city !== 'All Locations'
+      ? filters.city
+      : filters.state && filters.state !== 'all'
+      ? filters.state
+      : filters.area !== 'all' && filters.area !== 'All Areas' && filters.area !== 'All Locations'
+      ? filters.area
+      : 'Location';
   const partyLabel =
     PARTY_SIZE_OPTIONS.find((p) => p.id === filters.partySize)?.label || 'Party Size';
   const budgetLabel =
@@ -418,34 +449,89 @@ export function ThemedSearchBar({
               )}
 
               {activeModalType === 'area' && (
-                <View style={styles.pillsGrid}>
-                  {availableAreas.map((area) => {
-                    const isSelected =
-                      tempValue === area ||
-                      (area === 'All Areas' && tempValue === 'all');
-                    return (
+                <View style={{ gap: 16 }}>
+                  {/* State Section */}
+                  <View>
+                    <View style={styles.filterSectionHeader}>
+                      <Text style={styles.filterSectionLabel}>STATE</Text>
+                      {tempStateValue !== 'all' && (
+                        <TouchableOpacity onPress={() => { setTempStateValue('all'); setTempCityValue('all'); }} hitSlop={8}>
+                          <Text style={styles.filterClearText}>Clear state</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalPillsScroll}>
                       <TouchableOpacity
-                        key={area}
-                        onPress={() =>
-                          setTempValue(area === 'All Areas' ? 'all' : area)
-                        }
-                        style={[styles.modalPill, isSelected && styles.modalPillSelected]}
+                        onPress={() => { setTempStateValue('all'); setTempCityValue('all'); }}
+                        style={[styles.modalPill, tempStateValue === 'all' && styles.modalPillSelected]}
                         activeOpacity={0.75}
                       >
-                        {isSelected && (
-                          <Check size={13} color="#FAF5ED" style={{ marginRight: 5 }} />
-                        )}
-                        <Text
-                          style={[
-                            styles.modalPillText,
-                            isSelected && styles.modalPillTextSelected,
-                          ]}
-                        >
-                          {area}
+                        {tempStateValue === 'all' && <Check size={13} color="#FAF5ED" style={{ marginRight: 4 }} />}
+                        <Text style={[styles.modalPillText, tempStateValue === 'all' && styles.modalPillTextSelected]}>All States</Text>
+                      </TouchableOpacity>
+                      {NIGERIAN_STATES.map((state) => {
+                        const isSelected = tempStateValue.toLowerCase() === state.toLowerCase();
+                        return (
+                          <TouchableOpacity
+                            key={state}
+                            onPress={() => {
+                              setTempStateValue(state);
+                              setTempCityValue('all');
+                            }}
+                            style={[styles.modalPill, isSelected && styles.modalPillSelected]}
+                            activeOpacity={0.75}
+                          >
+                            {isSelected && <Check size={13} color="#FAF5ED" style={{ marginRight: 4 }} />}
+                            <Text style={[styles.modalPillText, isSelected && styles.modalPillTextSelected]}>{state}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+
+                  {/* City / Area Section */}
+                  <View>
+                    <View style={styles.filterSectionHeader}>
+                      <Text style={styles.filterSectionLabel}>
+                        {tempStateValue === 'all' ? 'POPULAR CITIES & AREAS' : `CITIES IN ${tempStateValue.toUpperCase()}`}
+                      </Text>
+                      {tempCityValue !== 'all' && (
+                        <TouchableOpacity onPress={() => setTempCityValue('all')} hitSlop={8}>
+                          <Text style={styles.filterClearText}>Clear city</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    <View style={styles.pillsGrid}>
+                      <TouchableOpacity
+                        onPress={() => setTempCityValue('all')}
+                        style={[styles.modalPill, tempCityValue === 'all' && styles.modalPillSelected]}
+                        activeOpacity={0.75}
+                      >
+                        {tempCityValue === 'all' && <Check size={13} color="#FAF5ED" style={{ marginRight: 4 }} />}
+                        <Text style={[styles.modalPillText, tempCityValue === 'all' && styles.modalPillTextSelected]}>
+                          {tempStateValue === 'all' ? 'All Locations' : `All Cities in ${tempStateValue}`}
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
+
+                      {(tempStateValue === 'all'
+                        ? availableAreas.filter(a => a !== 'All Areas' && a !== 'All Locations')
+                        : getCitiesForState(tempStateValue, availableAreas.filter(a => a !== 'All Areas' && a !== 'All Locations'))
+                      ).map((city) => {
+                        const isSelected = tempCityValue.toLowerCase() === city.toLowerCase();
+                        return (
+                          <TouchableOpacity
+                            key={city}
+                            onPress={() => setTempCityValue(city)}
+                            style={[styles.modalPill, isSelected && styles.modalPillSelected]}
+                            activeOpacity={0.75}
+                          >
+                            {isSelected && <Check size={13} color="#FAF5ED" style={{ marginRight: 4 }} />}
+                            <Text style={[styles.modalPillText, isSelected && styles.modalPillTextSelected]}>{city}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
                 </View>
               )}
 
@@ -731,6 +817,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
+  },
+  filterSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  filterSectionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Palette.mutedText,
+    letterSpacing: 0.6,
+  },
+  filterClearText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  horizontalPillsScroll: {
+    gap: 8,
+    paddingVertical: 2,
   },
   pillsGrid: {
     flexDirection: 'row',

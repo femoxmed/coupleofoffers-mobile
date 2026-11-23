@@ -27,6 +27,8 @@ import { formatNaira, resolveImageUrl, Config } from '../../constants/config';
 import { resolveImageSource } from '../../constants/images';
 import { catalogService, type PartnerDetail } from '../../services/catalog';
 import { OfferCard } from '../../components/OfferCard';
+import { useLocationStore } from '../../store/useLocationStore';
+import { getOfferDistanceBadge } from '../../utils/distance';
 
 function getInitials(name: string) {
   return (
@@ -42,6 +44,7 @@ function getInitials(name: string) {
 export default function PartnerDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const { currentLocation } = useLocationStore();
 
   const { data: partner, isLoading, refetch } = useQuery<PartnerDetail>({
     queryKey: ['partner', slug],
@@ -252,7 +255,16 @@ export default function PartnerDetailScreen() {
 
           {packages.length > 0 ? (
             packages.map((pkg) => (
-              <OfferCard key={pkg.id} offer={pkg} layout="compact" />
+              <OfferCard
+                key={pkg.id}
+                offer={pkg}
+                layout="compact"
+                distanceBadge={getOfferDistanceBadge(
+                  pkg,
+                  currentLocation?.latitude,
+                  currentLocation?.longitude
+                )}
+              />
             ))
           ) : (
             <View style={styles.emptyPackagesCard}>

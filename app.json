@@ -9,13 +9,13 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ng.coupleofoffers.mobile",
+      "bundleIdentifier": "com.coupleofoffers.mobile",
       "appleTeamId": "SQ3FWC7Q3B",
       "icon": "./assets/images/icon.png",
       "buildNumber": "2"
     },
     "android": {
-      "package": "ng.coupleofoffers.mobile",
+      "package": "com.coupleofoffers.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#301D32",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
