@@ -20,6 +20,9 @@ import {
   ChefHat,
   Sun,
   Layers,
+  CircleDot,
+  Mic,
+  Sparkles,
 } from 'lucide-react-native';
 import { Palette } from '../constants/Colors';
 import { resolveImageSource } from '../constants/images';
@@ -46,6 +49,9 @@ export const WEB_HOMEPAGE_CATEGORIES: TopCategory[] = [
   { id: 'outdoors', name: 'Outdoor dates', image: '/images/outdoors.jpg', icon: Trees },
   { id: 'cooking', name: 'Cooking classes', image: '/images/account-chef.jpg', icon: ChefHat },
   { id: 'beach', name: 'Beach clubs', image: '/images/outdoors.jpg', icon: Sun },
+  { id: 'bowling', name: 'Bowling', image: '/images/gaming.jpg', icon: CircleDot },
+  { id: 'karaoke', name: 'Karaoke', image: '/images/music.jpg', icon: Mic },
+  { id: 'other', name: 'Other experiences', image: '/images/terrace-evening.jpg', icon: Sparkles },
 ];
 
 interface TopCategoryNavProps {

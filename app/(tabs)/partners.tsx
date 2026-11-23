@@ -60,12 +60,17 @@ export default function PartnersScreen() {
         matchesArea = pArea.includes(filters.area.toLowerCase());
       }
 
-      // Category filter
+      // Category filter (supports multi-select)
       let matchesCategory = true;
-      if (filters.category !== 'all') {
-        const cat = filters.category.toLowerCase();
+      const activeCats = (filters.categories && filters.categories.length > 0)
+        ? filters.categories
+        : (filters.category && filters.category !== 'all'
+            ? filters.category.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
+            : ['all']);
+
+      if (!activeCats.includes('all')) {
         const pCat = (p.primary_category || (p as any).cuisine_type || '').toLowerCase();
-        matchesCategory = pCat.includes(cat);
+        matchesCategory = activeCats.some((cat) => pCat.includes(cat));
       }
 
       return matchesSearch && matchesArea && matchesCategory;
@@ -74,6 +79,17 @@ export default function PartnersScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Fixed search bar — always visible above the scrollable list */}
+      <ThemedSearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search venues by name or area..."
+        filters={filters}
+        onApplyFilters={setFilters}
+        availableAreas={areas}
+        showFilterChips={true}
+      />
+
       <BrandRefreshFlatList
         data={filteredPartners}
         keyExtractor={(item) => item.id}
@@ -92,17 +108,6 @@ export default function PartnersScreen() {
                 Verified partner restaurants, boutique rooftops, and intimate spaces.
               </Text>
             </View>
-
-            {/* Reused Themed Search Bar with Filter in the Search Box */}
-            <ThemedSearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search venues by name or area..."
-              filters={filters}
-              onApplyFilters={setFilters}
-              availableAreas={areas}
-              showFilterChips={true}
-            />
 
             <View style={styles.metaRow}>
               <Text style={styles.metaCount}>

@@ -28,6 +28,7 @@ export default function ExploreScreen() {
   const params = useLocalSearchParams<{
     q?: string;
     category?: string;
+    categories?: string;
     area?: string;
     state?: string;
     city?: string;
@@ -35,28 +36,47 @@ export default function ExploreScreen() {
     priceRange?: string;
   }>();
 
+  const parseCategoryParam = (raw?: string): string[] => {
+    if (!raw || raw === 'all' || raw === 'All Dates' || raw === 'All offers') return ['all'];
+    const parts = raw.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean);
+    const resolved = parts.map((part) => {
+      const match = CATEGORY_OPTIONS.find(
+        (c) =>
+          c.id.toLowerCase() === part ||
+          c.label.toLowerCase() === part ||
+          c.label.toLowerCase().includes(part)
+      );
+      return match ? match.id : part;
+    });
+    return resolved.length > 0 ? resolved : ['all'];
+  };
+
   const { currentLocation } = useLocationStore();
   const searchQuery = useSearchStore((s) => s.query);
   const setSearchQuery = useSearchStore((s) => s.setQuery);
-  const [filters, setFilters] = useState<FilterState>({
-    category: params.category || 'all',
-    area: params.area || params.city || 'all',
-    state: params.state || 'all',
-    city: params.city || 'all',
-    partySize: params.partySize || 'all',
-    priceRange: params.priceRange || 'all',
+
+  const [filters, setFilters] = useState<FilterState>(() => {
+    const initialCats = parseCategoryParam(params.categories || params.category);
+    return {
+      category: initialCats.join(','),
+      categories: initialCats,
+      area: params.area || params.city || 'all',
+      state: params.state || 'all',
+      city: params.city || 'all',
+      partySize: params.partySize || 'all',
+      priceRange: params.priceRange || 'all',
+    };
   });
 
   useEffect(() => {
     if (params.q !== undefined) setSearchQuery(params.q);
-    if (params.category !== undefined) {
-      // Find matching category ID if a name was passed
-      const match = CATEGORY_OPTIONS.find(
-        (c) =>
-          c.id.toLowerCase() === params.category?.toLowerCase() ||
-          c.label.toLowerCase().includes(params.category?.toLowerCase() || '')
-      );
-      setFilters((prev) => ({ ...prev, category: match ? match.id : params.category || 'all' }));
+    if (params.category !== undefined || params.categories !== undefined) {
+      const parsed = parseCategoryParam(params.categories || params.category);
+      setFilters((prev) => ({
+        ...prev,
+        categories: parsed,
+        category: parsed.join(','),
+      }));
     }
     if (params.area !== undefined || params.city !== undefined) {
       setFilters((prev) => ({
@@ -68,7 +88,7 @@ export default function ExploreScreen() {
     if (params.state !== undefined) {
       setFilters((prev) => ({ ...prev, state: params.state || 'all' }));
     }
-  }, [params.q, params.category, params.area, params.state, params.city]);
+  }, [params.q, params.category, params.categories, params.area, params.state, params.city]);
 
   const { data: offers, isLoading, isRefetching, isError, refetch } = useQuery<Offer[]>({
     queryKey: ['offers'],
@@ -107,13 +127,21 @@ export default function ExploreScreen() {
         offer.state?.toLowerCase().includes(query) ||
         offer.category.toLowerCase().includes(query);
 
-      // 2. Category Filter
+      // 2. Category Filter (multi-select)
       let matchesCategory = true;
-      if (filters.category !== 'all') {
-        const cat = filters.category.toLowerCase();
-        matchesCategory =
-          offer.category.toLowerCase().includes(cat) ||
-          (cat === 'dining' && offer.category.toLowerCase().includes('dinner'));
+      const activeCats = (filters.categories && filters.categories.length > 0)
+        ? filters.categories
+        : (filters.category && filters.category !== 'all'
+            ? filters.category.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
+            : ['all']);
+
+      if (!activeCats.includes('all')) {
+        const offerCat = offer.category.toLowerCase();
+        matchesCategory = activeCats.some(
+          (cat) =>
+            offerCat.includes(cat) ||
+            (cat === 'dining' && offerCat.includes('dinner'))
+        );
       }
 
       // 3. Location Filter (State & City / Area)
@@ -176,6 +204,17 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Fixed search bar — always visible above the scrollable list */}
+      <ThemedSearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search experiences, venues, or areas..."
+        filters={filters}
+        onApplyFilters={setFilters}
+        availableAreas={availableAreas}
+        showFilterChips={true}
+      />
+
       <BrandRefreshFlatList
         data={filteredOffers}
         keyExtractor={(item) => item.id}
@@ -198,17 +237,6 @@ export default function ExploreScreen() {
             }}
         ListHeaderComponent={
           <View style={styles.headerBlock}>
-            {/* Reusable Themed Search Bar with Filter in the Search Box */}
-            <ThemedSearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search experiences, venues, or areas..."
-              filters={filters}
-              onApplyFilters={setFilters}
-              availableAreas={availableAreas}
-              showFilterChips={true}
-            />
-
             {/* Results Counter Row */}
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>

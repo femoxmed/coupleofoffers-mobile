@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,11 +20,13 @@ import {
 } from 'lucide-react-native';
 import { Palette } from '../constants/Colors';
 import { NIGERIAN_STATES, getCitiesForState } from '../constants/nigerian-locations';
+import { useCategories, FALLBACK_CATEGORIES } from '../hooks/useCategories';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export interface FilterState {
   category: string;
+  categories?: string[];
   area: string;
   state?: string;
   city?: string;
@@ -34,6 +36,7 @@ export interface FilterState {
 
 export const DEFAULT_FILTERS: FilterState = {
   category: 'all',
+  categories: ['all'],
   area: 'all',
   state: 'all',
   city: 'all',
@@ -41,18 +44,10 @@ export const DEFAULT_FILTERS: FilterState = {
   priceRange: 'all',
 };
 
-export const CATEGORY_OPTIONS = [
-  { id: 'all', label: 'All Dates' },
-  { id: 'dining', label: 'Restaurants' },
-  { id: 'spa', label: 'Spas' },
-  { id: 'gaming', label: 'Game Houses' },
-  { id: 'bar', label: 'Bars' },
-  { id: 'lounge', label: 'Lounges' },
-  { id: 'cinema', label: 'Cinema' },
-  { id: 'music', label: 'Live Music' },
-  { id: 'art', label: 'Art Workshops' },
-  { id: 'outdoors', label: 'Outdoors' },
-];
+export const CATEGORY_OPTIONS = FALLBACK_CATEGORIES.map((c) => ({
+  id: c.id,
+  label: c.label,
+}));
 
 export const PARTY_SIZE_OPTIONS = [
   { id: 'all', label: 'Any group' },
@@ -98,13 +93,35 @@ export function ThemedSearchBar({
   initialPillsExpanded = false,
   showFilterChips = true,
 }: ThemedSearchBarProps) {
+  const { categories: dynamicCategories } = useCategories();
+
+  const categoryOptions = useMemo(() => {
+    return dynamicCategories.map((c) => ({
+      id: c.id,
+      label: c.label || c.name,
+    }));
+  }, [dynamicCategories]);
+
+  const currentCategories = useMemo<string[]>(() => {
+    if (Array.isArray(filters.categories) && filters.categories.length > 0) {
+      return filters.categories;
+    }
+    if (filters.category && filters.category !== 'all') {
+      return filters.category.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean);
+    }
+    return ['all'];
+  }, [filters.categories, filters.category]);
+
+  const isCategoryActive = currentCategories.length > 0 && !currentCategories.includes('all');
+
   // Count active filters (excluding 'all')
   const activeCount = Object.entries(filters).filter(
     ([key, val]) => {
+      if (key === 'category' || key === 'categories') return false;
       if (key === 'area' && ((filters.city && filters.city !== 'all') || (filters.state && filters.state !== 'all'))) return false;
       return val && val !== 'all' && val !== 'All Areas' && val !== 'All Locations';
     }
-  ).length;
+  ).length + (isCategoryActive ? 1 : 0);
 
   // The pills only show when user clicks the filter icon (or if active filters already exist)
   const [pillsExpanded, setPillsExpanded] = useState<boolean>(
@@ -115,6 +132,7 @@ export function ThemedSearchBar({
   const [activeModalType, setActiveModalType] = useState<ModalFilterType>(null);
 
   // Temporary selection while modal is open
+  const [tempCategories, setTempCategories] = useState<string[]>(['all']);
   const [tempValue, setTempValue] = useState<string>('');
   const [tempStateValue, setTempStateValue] = useState<string>('all');
   const [tempCityValue, setTempCityValue] = useState<string>('all');
@@ -125,7 +143,7 @@ export function ThemedSearchBar({
 
   const openFilterModal = (type: ModalFilterType) => {
     if (!type) return;
-    if (type === 'category') setTempValue(filters.category);
+    if (type === 'category') setTempCategories(currentCategories);
     else if (type === 'area') {
       setTempStateValue(filters.state || 'all');
       setTempCityValue(filters.city || (filters.area !== 'all' && filters.area !== 'All Areas' ? filters.area : 'all'));
@@ -138,7 +156,11 @@ export function ThemedSearchBar({
   const handleApplySingle = () => {
     if (!activeModalType) return;
     const updated: FilterState = { ...filters };
-    if (activeModalType === 'category') updated.category = tempValue;
+    if (activeModalType === 'category') {
+      const isAll = tempCategories.length === 0 || tempCategories.includes('all');
+      updated.categories = isAll ? ['all'] : tempCategories;
+      updated.category = isAll ? 'all' : tempCategories.join(',');
+    }
     else if (activeModalType === 'area') {
       updated.state = tempStateValue;
       updated.city = tempCityValue;
@@ -154,7 +176,11 @@ export function ThemedSearchBar({
   const handleResetSingle = () => {
     if (!activeModalType) return;
     const updated: FilterState = { ...filters };
-    if (activeModalType === 'category') updated.category = 'all';
+    if (activeModalType === 'category') {
+      updated.categories = ['all'];
+      updated.category = 'all';
+      setTempCategories(['all']);
+    }
     else if (activeModalType === 'area') {
       updated.state = 'all';
       updated.city = 'all';
@@ -171,15 +197,22 @@ export function ThemedSearchBar({
   };
 
   const handleResetAll = () => {
-    const reset: FilterState = { ...DEFAULT_FILTERS, state: 'all', city: 'all', area: 'all' };
+    const reset: FilterState = { ...DEFAULT_FILTERS, categories: ['all'], category: 'all', state: 'all', city: 'all', area: 'all' };
+    setTempCategories(['all']);
     setTempStateValue('all');
     setTempCityValue('all');
     onApplyFilters?.(reset);
   };
 
   // Human-readable labels for chips
-  const categoryLabel =
-    CATEGORY_OPTIONS.find((c) => c.id === filters.category)?.label || 'Category';
+  const categoryLabel = useMemo(() => {
+    if (!isCategoryActive) return 'Category';
+    if (currentCategories.length === 1) {
+      const found = categoryOptions.find((c) => c.id.toLowerCase() === currentCategories[0].toLowerCase());
+      return found?.label || currentCategories[0];
+    }
+    return `Categories (${currentCategories.length})`;
+  }, [isCategoryActive, currentCategories, categoryOptions]);
   const areaLabel =
     filters.city && filters.city !== 'all' && filters.city !== 'All Areas' && filters.city !== 'All Locations'
       ? filters.city
@@ -286,21 +319,21 @@ export function ThemedSearchBar({
             onPress={() => openFilterModal('category')}
             style={[
               styles.chip,
-              filters.category !== 'all' && styles.chipActive,
+              isCategoryActive && styles.chipActive,
             ]}
             activeOpacity={0.75}
           >
             <Text
               style={[
                 styles.chipText,
-                filters.category !== 'all' && styles.chipTextActive,
+                isCategoryActive && styles.chipTextActive,
               ]}
             >
               {categoryLabel}
             </Text>
             <ChevronDown
               size={12}
-              color={filters.category !== 'all' ? '#FAF5ED' : Palette.mutedText}
+              color={isCategoryActive ? '#FAF5ED' : Palette.mutedText}
               style={{ marginLeft: 3 }}
             />
           </TouchableOpacity>
@@ -422,12 +455,29 @@ export function ThemedSearchBar({
             >
               {activeModalType === 'category' && (
                 <View style={styles.pillsGrid}>
-                  {CATEGORY_OPTIONS.map((item) => {
-                    const isSelected = tempValue === item.id;
+                  {categoryOptions.map((item) => {
+                    const isAll = item.id === 'all';
+                    const isSelected = isAll
+                      ? tempCategories.includes('all')
+                      : tempCategories.includes(item.id);
                     return (
                       <TouchableOpacity
                         key={item.id}
-                        onPress={() => setTempValue(item.id)}
+                        onPress={() => {
+                          if (isAll) {
+                            setTempCategories(['all']);
+                          } else {
+                            setTempCategories((prev) => {
+                              const withoutAll = prev.filter((id) => id !== 'all');
+                              if (withoutAll.includes(item.id)) {
+                                const remaining = withoutAll.filter((id) => id !== item.id);
+                                return remaining.length > 0 ? remaining : ['all'];
+                              } else {
+                                return [...withoutAll, item.id];
+                              }
+                            });
+                          }
+                        }}
                         style={[styles.modalPill, isSelected && styles.modalPillSelected]}
                         activeOpacity={0.75}
                       >

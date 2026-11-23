@@ -53,6 +53,7 @@ import { LocationPickerModal } from '../../components/LocationPickerModal';
 import { FirstRunLocationSheet, hasCompletedFirstRun } from '../../components/FirstRunLocationSheet';
 import { TrustPropositionBanner } from '../../components/TrustPropositionBanner';
 import { useSearchStore } from '../../store/useSearchStore';
+import { useCategories } from '../../hooks/useCategories';
 import { getOfferDistanceBadge } from '../../utils/distance';
 import type { Offer, Partner, HomepageSlide } from '../../types';
 
@@ -110,19 +111,7 @@ export default function HomeScreen() {
     queryFn: () => catalogService.getHomepageSlides(),
   });
 
-  const { data: apiCategories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => catalogService.getCategories(),
-  });
-  const categories = useMemo(() => {
-    if (!apiCategories?.length) return WEB_HOMEPAGE_CATEGORIES;
-    return apiCategories.map((item) => ({
-      id: item.slug,
-      name: item.name,
-      image: WEB_HOMEPAGE_CATEGORIES.find((category) => category.id === item.slug)?.image || '/images/terrace-evening.jpg',
-      icon: WEB_HOMEPAGE_CATEGORIES.find((category) => category.id === item.slug)?.icon || WEB_HOMEPAGE_CATEGORIES[0].icon,
-    }));
-  }, [apiCategories]);
+  const { categories } = useCategories();
 
   // 2. Fetch Featured Partners
   const { data: partners, isLoading: partnersLoading, isError: partnersError, refetch: refetchPartners } = useQuery<Partner[]>({
@@ -365,7 +354,7 @@ export default function HomeScreen() {
           onSelect={(cat) => {
             router.push({
               pathname: '/(tabs)/explore',
-              params: { category: cat.name === 'All offers' ? 'All Dates' : cat.name },
+              params: { category: cat.id === 'all' ? 'all' : cat.id },
             });
           }}
         />
