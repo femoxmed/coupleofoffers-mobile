@@ -76,6 +76,9 @@ export default function OfferDetailScreen() {
   const [email, setEmail] = useState<string>(authUser?.email || '');
   const [bookingMessage, setBookingMessage] = useState('');
   const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
+  const [isAskToPayModalVisible, setIsAskToPayModalVisible] = useState(false);
+  const [createdPaymentLink, setCreatedPaymentLink] = useState<string | null>(null);
+  const [paymentRequestBusy, setPaymentRequestBusy] = useState(false);
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [isEnquiryModalVisible, setIsEnquiryModalVisible] = useState(false);
   const [enquiryName, setEnquiryName] = useState(authUser?.name || '');
@@ -507,31 +510,42 @@ export default function OfferDetailScreen() {
       Alert.alert('Select arrival time', 'Choose a date and time first so the request contains the exact booking details.');
       return;
     }
+    if (!authUser?.email) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to create and share a payment request.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sign In',
+            onPress: () => {
+              setIsAskToPayModalVisible(false);
+              router.push('/login');
+            },
+          },
+        ]
+      );
+      return;
+    }
+    setPaymentRequestBusy(true);
     try {
-      if (!authUser?.email) {
-        Alert.alert('Sign in first', 'Sign in to create and share a payment request.');
-        return;
-      }
       const request = await checkoutService.createPaymentRequest({ offerId: offer.id, slotId: selectedSlot, partySize });
       const link = `https://coupleofoffers.com/pay-for?token=${encodeURIComponent(request.token)}`;
+      setCreatedPaymentLink(link);
       const formattedDate = new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' });
-      await Share.share({ title: `Payment request for ${offer.title}`, message: `I found an experience I’d love to share with you. Could you help cover this booking? This request is for ${offer.title} at ${offer.venue_name || offer.venue}, on ${formattedDate}, for ${partySize} ${partySize === 1 ? 'guest' : 'guests'}. It expires in 7 days:\n\n${link}` });
+      await Share.share({
+        title: `Payment request for ${offer.title}`,
+        message: `I found an experience I’d love to share with you. Could you help cover this booking? This request is for ${offer.title} at ${offer.venue_name || offer.venue}, on ${formattedDate}, for ${partySize} ${partySize === 1 ? 'guest' : 'guests'}. It expires in 7 days:\n\n${link}`,
+      });
     } catch (error) {
       Alert.alert('Could not create payment request', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setPaymentRequestBusy(false);
     }
   };
 
   const handleAskToPayFromBottomBar = () => {
-    if (!selectedDate || !selectedSlot) {
-      setSelectedSlot(null);
-      setIsBookingModalVisible(true);
-      Alert.alert(
-        'Select Date & Time First',
-        'Choose your date and arrival time so your payment request contains the exact booking details to share.'
-      );
-      return;
-    }
-    void handleAskSomeoneToPay();
+    setIsAskToPayModalVisible(true);
   };
 
   if (!isLoading && !offer) {
@@ -1511,6 +1525,454 @@ export default function OfferDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ========================================================= */}
+      {/* STREAMLINED "ASK SOMEONE TO PAY" MODAL */}
+      {/* ========================================================= */}
+      <Modal
+        visible={isAskToPayModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsAskToPayModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalSheet}>
+            {/* Header / Handle */}
+            <View style={styles.modalHandleWrap}>
+              <View style={styles.modalDragHandle} />
+            </View>
+
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.modalEyebrow}>ASK SOMEONE TO PAY</Text>
+                <Text style={styles.modalTitle}>Share Payment Request</Text>
+                <Text style={styles.modalSubtitle} numberOfLines={1}>
+                  {offer.title} • {cleanVenueName}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setIsAskToPayModalVisible(false)}
+                style={styles.modalCloseBtn}
+                hitSlop={8}
+              >
+                <X size={20} color={Palette.aubergine} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Scrollable Streamlined Booking Form */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              style={{ flex: 1 }}
+            >
+              {/* Notice Banner */}
+              <View style={styles.askToPayBanner}>
+                <Share2 size={16} color={Palette.mulberry} style={{ marginRight: 8, marginTop: 1 }} />
+                <Text style={styles.askToPayBannerText}>
+                  Choose your guests and arrival time. We’ll generate a request link locking in your exact booking details.
+                </Text>
+              </View>
+
+              {/* 1. Branch Selector as Dropdown (if multiple) */}
+              {hasMultipleBranches && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionLabel}>Select Branch Location</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsBranchDropdownOpen(!isBranchDropdownOpen);
+                      setIsCalendarOpen(false);
+                      setIsTimeDropdownOpen(false);
+                    }}
+                    style={[
+                      styles.dropdownTrigger,
+                      isBranchDropdownOpen && styles.dropdownTriggerActive,
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.dropdownLeft}>
+                      <Store size={18} color={Palette.mulberry} style={{ marginRight: 8 }} />
+                      <Text style={styles.dropdownValueText} numberOfLines={1}>
+                        {selectedBranchObj?.name.replace(/,\s*Lagos.*$/i, '').trim() ||
+                          'Select branch location...'}
+                      </Text>
+                    </View>
+                    {isBranchDropdownOpen ? (
+                      <ChevronUp size={16} color={Palette.aubergine} />
+                    ) : (
+                      <ChevronDown size={16} color={Palette.aubergine} />
+                    )}
+                  </TouchableOpacity>
+
+                  {isBranchDropdownOpen && (
+                    <View style={styles.dropdownMenu}>
+                      {branches.map((b) => {
+                        const isSelected = selectedBranchId === b.id;
+                        return (
+                          <TouchableOpacity
+                            key={b.id}
+                            onPress={() => {
+                              setSelectedBranchId(b.id);
+                              setIsBranchDropdownOpen(false);
+                              setCreatedPaymentLink(null);
+                              if (b.offer_id !== offer.id) {
+                                setSelectedSlot(null);
+                                setSelectedDate('');
+                                router.replace(`/offer/${b.offer_id}`);
+                              }
+                            }}
+                            style={[
+                              styles.dropdownItem,
+                              isSelected && styles.dropdownItemSelected,
+                            ]}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.dropdownItemTitle,
+                                isSelected && styles.dropdownItemTitleSelected,
+                              ]}
+                            >
+                              {b.name.replace(/,\s*Lagos.*$/i, '').trim()}
+                            </Text>
+                            {isSelected && (
+                              <Check size={16} color={Palette.mulberry} strokeWidth={2.5} />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* 2. Number of Guests */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionLabel}>Number of Guests</Text>
+                <View style={styles.partyCard}>
+                  <View style={styles.partyLeft}>
+                    <View style={styles.partyIconWrap}>
+                      <Users size={16} color={Palette.mulberry} />
+                    </View>
+                    <View>
+                      <Text style={styles.partyLabel}>
+                        {partySize} {partySize === 1 ? 'Guest' : 'Guests'}
+                      </Text>
+                      <Text style={styles.partySub}>
+                        {partySize === basePartySize
+                          ? `Base package includes ${basePartySize} guests`
+                          : `${partySize - basePartySize} extra guest(s)`}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.counterRow}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPartySize((p) => Math.max(basePartySize, p - 1));
+                        setCreatedPaymentLink(null);
+                      }}
+                      disabled={partySize <= basePartySize}
+                      style={[
+                        styles.counterBtn,
+                        partySize <= basePartySize && styles.counterBtnDisabled,
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Minus
+                        size={15}
+                        color={partySize <= basePartySize ? Palette.mutedText : Palette.aubergine}
+                      />
+                    </TouchableOpacity>
+
+                    <Text style={styles.counterNumber}>{partySize}</Text>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPartySize((p) => Math.min(maxPartySize, p + 1));
+                        setCreatedPaymentLink(null);
+                      }}
+                      disabled={partySize >= maxPartySize}
+                      style={[
+                        styles.counterBtn,
+                        partySize >= maxPartySize && styles.counterBtnDisabled,
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Plus
+                        size={15}
+                        color={partySize >= maxPartySize ? Palette.mutedText : Palette.aubergine}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {allowsMoreThanTwo && (
+                  <Text style={styles.guestHintText}>
+                    Each extra guest {formatNaira(extraGuestPrice)} • Max {maxPartySize} guests
+                  </Text>
+                )}
+              </View>
+
+              {/* 3. Arrival Date */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionLabel}>Arrival Date</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsCalendarOpen(!isCalendarOpen);
+                    setIsTimeDropdownOpen(false);
+                    setIsBranchDropdownOpen(false);
+                  }}
+                  style={[
+                    styles.dropdownTrigger,
+                    isCalendarOpen && styles.dropdownTriggerActive,
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.dropdownLeft}>
+                    <Calendar size={16} color={Palette.mulberry} style={{ marginRight: 8 }} />
+                    <Text style={styles.dropdownValueText}>
+                      {selectedDate ? formatDisplayDate(selectedDate) : 'Select arrival date...'}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={styles.changePill}>
+                      <Text style={styles.changePillText}>{isCalendarOpen ? 'Hide' : 'Change'}</Text>
+                    </View>
+                    {isCalendarOpen ? (
+                      <ChevronUp size={16} color={Palette.aubergine} />
+                    ) : (
+                      <ChevronDown size={16} color={Palette.aubergine} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                {isCalendarOpen && (
+                  <View style={styles.calendarCard}>
+                    <View style={styles.calMonthNav}>
+                      <TouchableOpacity
+                        onPress={handlePrevMonth}
+                        disabled={!canGoPrevMonth}
+                        style={[styles.calNavBtn, !canGoPrevMonth && { opacity: 0.25 }]}
+                        hitSlop={8}
+                      >
+                        <ChevronLeft size={16} color={Palette.aubergine} />
+                      </TouchableOpacity>
+                      <Text style={styles.calMonthTitle}>{calMonthName}</Text>
+                      <TouchableOpacity
+                        onPress={handleNextMonth}
+                        style={styles.calNavBtn}
+                        hitSlop={8}
+                      >
+                        <ChevronRight size={16} color={Palette.aubergine} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.calWeekdaysRow}>
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((wd) => (
+                        <Text key={wd} style={styles.calWeekdayText}>{wd}</Text>
+                      ))}
+                    </View>
+
+                    <View style={styles.calDaysGrid}>
+                      {Array.from({ length: leadingBlanks }).map((_, i) => (
+                        <View key={`blank-${i}`} style={styles.calDayCell} />
+                      ))}
+                      {Array.from({ length: daysInCalMonth }).map((_, i) => {
+                        const dayNum = i + 1;
+                        const dayStr = String(dayNum).padStart(2, '0');
+                        const monthStr = String(calMonth + 1).padStart(2, '0');
+                        const dateKey = `${calYear}-${monthStr}-${dayStr}`;
+                        const isPast = dateKey < todayStr;
+                        const isSelected = dateKey === selectedDate;
+                        const hasSlots = Boolean(slotsByDate[dateKey]?.length > 0);
+                        const isDisabled = isPast || !hasSlots;
+
+                        return (
+                          <TouchableOpacity
+                            key={dateKey}
+                            disabled={isDisabled}
+                            onPress={() => {
+                              handleSelectDate(dateKey);
+                              setCreatedPaymentLink(null);
+                            }}
+                            style={[
+                              styles.calDayCell,
+                              isSelected && styles.calDayCellSelected,
+                            ]}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.calDayText,
+                                isSelected && styles.calDayTextSelected,
+                                isDisabled && styles.calDayTextDisabled,
+                              ]}
+                            >
+                              {dayNum}
+                            </Text>
+                            {hasSlots && !isDisabled && !isSelected && (
+                              <View style={styles.calDayDot} />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* 4. Arrival Time */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionLabel}>Arrival Time</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!selectedDate) {
+                      setIsCalendarOpen(true);
+                    } else {
+                      setIsTimeDropdownOpen(!isTimeDropdownOpen);
+                      setIsBranchDropdownOpen(false);
+                      setIsCalendarOpen(false);
+                    }
+                  }}
+                  style={[
+                    styles.dropdownTrigger,
+                    isTimeDropdownOpen && styles.dropdownTriggerActive,
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.dropdownLeft}>
+                    <Clock size={16} color={Palette.mulberry} style={{ marginRight: 8 }} />
+                    <Text style={styles.dropdownValueText}>
+                      {currentSelectedSlot
+                        ? formatSlotTime(currentSelectedSlot.starts_at)
+                        : selectedDate
+                        ? 'Choose arrival time...'
+                        : 'Select arrival date first'}
+                    </Text>
+                  </View>
+                  {isTimeDropdownOpen ? (
+                    <ChevronUp size={16} color={Palette.aubergine} />
+                  ) : (
+                    <ChevronDown size={16} color={Palette.aubergine} />
+                  )}
+                </TouchableOpacity>
+
+                {isTimeDropdownOpen && (
+                  <View style={styles.dropdownMenu}>
+                    {availableSlotsForDate.length > 0 ? (
+                      availableSlotsForDate.map((slot) => {
+                        const isSlotSelected = selectedSlot === slot.id;
+                        return (
+                          <TouchableOpacity
+                            key={slot.id}
+                            onPress={() => {
+                              setSelectedSlot(slot.id);
+                              setIsTimeDropdownOpen(false);
+                              setCreatedPaymentLink(null);
+                            }}
+                            style={[
+                              styles.dropdownItem,
+                              isSlotSelected && styles.dropdownItemSelected,
+                            ]}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.dropdownItemTitle,
+                                isSlotSelected && styles.dropdownItemTitleSelected,
+                              ]}
+                            >
+                              {formatSlotTime(slot.starts_at)}
+                            </Text>
+                            {isSlotSelected && (
+                              <Check size={16} color={Palette.mulberry} strokeWidth={2.5} />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })
+                    ) : (
+                      <View style={styles.dropdownEmpty}>
+                        <Text style={styles.dropdownEmptyText}>
+                          No arrival slots available on this date.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+
+              {/* Ready Link preview */}
+              {createdPaymentLink && (
+                <View style={styles.readyLinkCard}>
+                  <Text style={styles.readyLinkTitle}>Your request link is ready to share!</Text>
+                  <Text style={styles.readyLinkUrl} numberOfLines={1}>{createdPaymentLink}</Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Bottom Bar for Streamlined Modal */}
+            <View
+              style={[
+                styles.modalFixedBottomBar,
+                { paddingBottom: Math.max(insets.bottom, 14) },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => void handleAskSomeoneToPay()}
+                disabled={paymentRequestBusy}
+                style={[
+                  styles.modalContinueButton,
+                  paymentRequestBusy && { opacity: 0.7 },
+                  (!selectedDate || !selectedSlot) && { opacity: 0.55 },
+                ]}
+                activeOpacity={0.88}
+              >
+                <View style={styles.bottomBookContent}>
+                  <View style={styles.bottomBookMainRow}>
+                    <Text style={styles.bottomBookTitle}>
+                      {paymentRequestBusy
+                        ? 'Creating Request...'
+                        : !selectedDate
+                        ? 'Select Arrival Date'
+                        : !selectedSlot
+                        ? 'Select Arrival Time'
+                        : createdPaymentLink
+                        ? 'Share Link Again'
+                        : 'Share Request Link'}
+                    </Text>
+                    <Text style={styles.bottomBookPrice}>{formatNaira(calculatedTotalKobo)}</Text>
+                  </View>
+                  <View style={styles.bottomBookSubRow}>
+                    <Text style={styles.bottomBookParty}>
+                      {partySize === 2 ? 'For two' : `${partySize} guests`}
+                    </Text>
+                    {totalSavingsKobo > 0 ? (
+                      <View style={styles.bottomBookSavingsTag}>
+                        <Text style={styles.bottomBookSavingsText}>
+                          Save {formatNaira(totalSavingsKobo)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.bottomBookSavingsTag}>
+                        <Text style={styles.bottomBookSavingsText}>All-inclusive</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                {paymentRequestBusy ? (
+                  <BrandLoader size="small" color={Palette.porcelain} />
+                ) : (
+                  <Share2 size={16} color={Palette.porcelain} style={styles.bottomBookArrow} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
       <Modal visible={isEnquiryModalVisible} transparent animationType="slide" onRequestClose={() => setIsEnquiryModalVisible(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.enquiryOverlay}>
           <View style={styles.enquirySheet}>
@@ -2012,6 +2474,7 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   bottomAskToPayBtn: {
+    minWidth: 156,
     paddingHorizontal: 12,
     height: 52,
     flexDirection: 'row',
@@ -2025,19 +2488,21 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   bottomAskToPayText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: Palette.mulberry,
+    letterSpacing: -0.1,
   },
   bottomBookButton: {
     flex: 1,
+    minWidth: 0,
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Palette.mulberry,
     borderRadius: 14,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     shadowColor: Palette.mulberry,
     shadowOffset: { width: 0, height: 3 },
@@ -2181,6 +2646,49 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Palette.border,
     backgroundColor: '#FFFFFF',
+  },
+  modalEyebrow: {
+    color: Palette.mulberry,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+  },
+  askToPayBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F5ECF0',
+    borderWidth: 1,
+    borderColor: 'rgba(116, 61, 96, 0.18)',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+  },
+  askToPayBannerText: {
+    flex: 1,
+    fontSize: 11,
+    color: Palette.aubergine,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+  readyLinkCard: {
+    backgroundColor: '#FAF5ED',
+    borderWidth: 1,
+    borderColor: '#E8DBC6',
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  readyLinkTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Palette.aubergine,
+    marginBottom: 2,
+  },
+  readyLinkUrl: {
+    fontSize: 10.5,
+    color: Palette.mulberry,
   },
   modalTitle: {
     fontSize: 17,
