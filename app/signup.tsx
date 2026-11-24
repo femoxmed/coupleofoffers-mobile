@@ -81,21 +81,12 @@ export default function SignupScreen() {
         trimmedName
       );
 
-      if (params.returnTo) {
-        router.replace({
-          pathname: params.returnTo as any,
-          params: {
-            intent: params.intent,
-            slotId: params.slotId,
-            partySize: params.partySize,
-            offerId: params.offerId,
-          },
-        });
-      } else if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/(tabs)/profile');
-      }
+      // Always show email verification screen after signup
+      const destination = params.returnTo || '/(tabs)/bookings';
+      router.replace({
+        pathname: '/verify-email' as any,
+        params: { email: trimmedEmail, returnTo: destination },
+      });
     } catch (err: any) {
       setError(err.message || 'Unable to create account. Please verify your details.');
     }

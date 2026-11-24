@@ -8,13 +8,14 @@ import { Palette } from '../constants/Colors';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSavedStore } from '../store/useSavedStore';
 import { LaunchSplash } from '../components/LaunchSplash';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 export {
   ErrorBoundary,
 } from 'expo-router';
 
 export const unstable_settings = {
-  initialRouteName: '(tabs)',
+  anchor: '(tabs)',
 };
 
 SplashScreen.preventAutoHideAsync();
@@ -22,6 +23,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [launching, setLaunching] = useState(true);
   const finishLaunch = useCallback(() => setLaunching(false), []);
+  usePushNotifications();
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -127,6 +129,21 @@ export default function RootLayout() {
           options={{
             headerTitle: 'Saved & Alerts',
             headerBackTitle: 'Back',
+          }}
+        />
+        <Stack.Screen
+          name="account-settings"
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="verify-email"
+          options={{
+            headerShown: false,
+            presentation: 'card',
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen

@@ -2119,7 +2119,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 252, 247, 0.92)',
+    backgroundColor: Palette.card,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

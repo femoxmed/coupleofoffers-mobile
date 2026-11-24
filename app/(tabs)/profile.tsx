@@ -28,16 +28,19 @@ import {
   ShieldCheck,
   ArrowRight,
   UserPlus,
+  Settings,
 } from 'lucide-react-native';
 import { Palette } from '../../constants/Colors';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSavedStore } from '../../store/useSavedStore';
 import { BrandWordmark } from '../../components/BrandWordmark';
+import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, login, logout, isLoading } = useAuthStore();
   const { savedOffers } = useSavedStore();
+  const { signInWithGoogle, loading: isGoogleLoading } = useGoogleAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -89,6 +92,11 @@ export default function ProfileScreen() {
       label: 'Saved Experiences',
       badge: savedOffers.length > 0 ? `${savedOffers.length}` : undefined,
       onPress: () => router.push('/saved' as any),
+    },
+    {
+      icon: Settings,
+      label: 'Account Settings',
+      onPress: () => router.push('/account-settings' as any),
     },
     {
       icon: Bell,
@@ -204,8 +212,8 @@ export default function ProfileScreen() {
             {/* Sign In Button */}
             <TouchableOpacity
               onPress={handleSignIn}
-              disabled={isLoading}
-              style={[styles.signInSubmitBtn, isLoading && { opacity: 0.7 }]}
+              disabled={isLoading || isGoogleLoading}
+              style={[styles.signInSubmitBtn, (isLoading || isGoogleLoading) && { opacity: 0.7 }]}
               activeOpacity={0.88}
             >
               {isLoading ? (
@@ -215,6 +223,30 @@ export default function ProfileScreen() {
                   <Text style={styles.signInSubmitText}>Sign In</Text>
                   <ArrowRight size={16} color={Palette.porcelain} style={{ marginLeft: 6 }} />
                 </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or continue with</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Google Sign In */}
+            <TouchableOpacity
+              onPress={signInWithGoogle}
+              disabled={isLoading || isGoogleLoading}
+              style={[styles.googleButton, (isLoading || isGoogleLoading) && { opacity: 0.7 }]}
+              activeOpacity={0.85}
+            >
+              {isGoogleLoading ? (
+                <BrandLoader color={Palette.aubergine} size="small" />
+              ) : (
+                <>
+                  <Text style={styles.googleIconText}>G</Text>
+                  <Text style={styles.googleButtonText}>Continue with Google</Text>
+                </>
               )}
             </TouchableOpacity>
           </View>
@@ -426,6 +458,48 @@ const styles = StyleSheet.create({
   signInSubmitText: {
     color: Palette.porcelain,
     fontSize: 15,
+    fontWeight: '700',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 14,
+    gap: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Palette.border,
+  },
+  dividerText: {
+    fontSize: 11.5,
+    color: Palette.mutedText,
+    fontWeight: '600',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Palette.porcelain,
+    borderRadius: 14,
+    height: 48,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    shadowColor: Palette.aubergine,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  googleIconText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#4285F4',
+    marginRight: 10,
+  },
+  googleButtonText: {
+    color: Palette.aubergine,
+    fontSize: 14,
     fontWeight: '700',
   },
   signUpPromptCard: {
